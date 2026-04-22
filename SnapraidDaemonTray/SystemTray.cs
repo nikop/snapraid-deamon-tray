@@ -11,7 +11,7 @@ using System.Text;
 
 namespace SnapraidDaemonTray;
 
-internal class SystemTray(IHostApplicationLifetime lifetime, IServiceProvider serviceProvider, IWinFormsContext winFormsContext) : IWinFormsService
+public class SystemTray(IHostApplicationLifetime lifetime, IServiceProvider serviceProvider, IWinFormsContext winFormsContext) : IWinFormsService
 {
     struct StatusMatrix
     {
@@ -66,6 +66,17 @@ internal class SystemTray(IHostApplicationLifetime lifetime, IServiceProvider se
         });
     }
 
+    public async Task StartMaintenance()
+    {
+        using var scope = serviceProvider.CreateScope();
+        var instances = await scope.ServiceProvider.GetRequiredService<InstanceManager>().GetAll(true);
+
+        foreach (var instance in instances)
+        {
+            await instance.StartMaintenance(supressNotification: false);
+        }
+    }
+
     public void Initialize()
     {
         systemTray = new NotifyIcon
@@ -74,6 +85,11 @@ internal class SystemTray(IHostApplicationLifetime lifetime, IServiceProvider se
             Visible = true,
             Text = ""
         };
+
+        contextMenuStrip.Items.Add("Run Maintenance on All Instances", null, async (sender, e) =>
+        {
+            await StartMaintenance();
+        });
 
         contextMenuStrip.Items.Add("Exit", null, (sender, e) =>
         {

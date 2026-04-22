@@ -63,9 +63,9 @@ public class Instance
         };
     }
 
-    public async Task StartMaintenance()
+    public async Task StartMaintenance(bool supressNotification = true)
     {
-        _manualMaintenanceRequested = true;
+        _manualMaintenanceRequested = supressNotification;
         var response = await _client.Snapraid.V1.Maintenance.PostAsMaintenancePostResponseAsync(new CommandRequest
         {
             IgnoreThresholds = false

@@ -30,10 +30,12 @@ partial class InstanceInfoDisplay
     {
         components = new System.ComponentModel.Container();
         openButton = new Button();
-        labelInstanceName = new Label();
+        contextMenu = new ContextMenuStrip(components);
+        toolStripMenuItemDashboard = new ToolStripMenuItem();
+        toolStripMenuItemMaintenance = new ToolStripMenuItem();
+        labelInstanceName = new LinkLabel();
         instanceStatusInfoBindingSource = new BindingSource(components);
         panelActions = new Panel();
-        btnSync = new Button();
         statusImage = new PictureBox();
         panelArrayStatus = new Panel();
         tableLayoutPanel1 = new TableLayoutPanel();
@@ -45,6 +47,7 @@ partial class InstanceInfoDisplay
         tableLayoutPanel2 = new TableLayoutPanel();
         labelTaskName = new Label();
         taskProgressBar = new ProgressBar();
+        contextMenu.SuspendLayout();
         ((System.ComponentModel.ISupportInitialize)instanceStatusInfoBindingSource).BeginInit();
         panelActions.SuspendLayout();
         ((System.ComponentModel.ISupportInitialize)statusImage).BeginInit();
@@ -56,14 +59,35 @@ partial class InstanceInfoDisplay
         // 
         // openButton
         // 
+        openButton.ContextMenuStrip = contextMenu;
         openButton.Dock = DockStyle.Right;
         openButton.Location = new Point(432, 8);
         openButton.Name = "openButton";
         openButton.Size = new Size(111, 24);
         openButton.TabIndex = 0;
-        openButton.Text = "Open Dashboard";
+        openButton.Text = "Actions";
         openButton.UseVisualStyleBackColor = true;
         openButton.Click += openButton_Click;
+        // 
+        // contextMenu
+        // 
+        contextMenu.Items.AddRange(new ToolStripItem[] { toolStripMenuItemDashboard, toolStripMenuItemMaintenance });
+        contextMenu.Name = "contextMenu";
+        contextMenu.Size = new Size(168, 48);
+        // 
+        // toolStripMenuItemDashboard
+        // 
+        toolStripMenuItemDashboard.Name = "toolStripMenuItemDashboard";
+        toolStripMenuItemDashboard.Size = new Size(167, 22);
+        toolStripMenuItemDashboard.Text = "Open Dashboard";
+        toolStripMenuItemDashboard.Click += toolStripMenuItemDashboard_Click;
+        // 
+        // toolStripMenuItemMaintenance
+        // 
+        toolStripMenuItemMaintenance.Name = "toolStripMenuItemMaintenance";
+        toolStripMenuItemMaintenance.Size = new Size(167, 22);
+        toolStripMenuItemMaintenance.Text = "Run Maintenance";
+        toolStripMenuItemMaintenance.Click += toolStripMenuItemMaintenance_Click;
         // 
         // labelInstanceName
         // 
@@ -71,11 +95,14 @@ partial class InstanceInfoDisplay
         labelInstanceName.DataBindings.Add(new Binding("Text", instanceStatusInfoBindingSource, "Name", true));
         labelInstanceName.Dock = DockStyle.Left;
         labelInstanceName.Font = new Font("Segoe UI", 14.25F, FontStyle.Bold, GraphicsUnit.Point, 0);
+        labelInstanceName.LinkColor = SystemColors.ActiveCaption;
         labelInstanceName.Location = new Point(40, 8);
         labelInstanceName.Name = "labelInstanceName";
         labelInstanceName.Size = new Size(64, 25);
         labelInstanceName.TabIndex = 1;
+        labelInstanceName.TabStop = true;
         labelInstanceName.Text = "Name";
+        labelInstanceName.LinkClicked += labelInstanceName_LinkClicked;
         labelInstanceName.Click += labelInstanceName_Click;
         // 
         // instanceStatusInfoBindingSource
@@ -86,7 +113,7 @@ partial class InstanceInfoDisplay
         // 
         // panelActions
         // 
-        panelActions.Controls.Add(btnSync);
+        panelActions.ContextMenuStrip = contextMenu;
         panelActions.Controls.Add(labelInstanceName);
         panelActions.Controls.Add(statusImage);
         panelActions.Controls.Add(openButton);
@@ -96,17 +123,6 @@ partial class InstanceInfoDisplay
         panelActions.Padding = new Padding(8);
         panelActions.Size = new Size(551, 40);
         panelActions.TabIndex = 2;
-        // 
-        // btnSync
-        // 
-        btnSync.Dock = DockStyle.Right;
-        btnSync.Location = new Point(363, 8);
-        btnSync.Name = "btnSync";
-        btnSync.Size = new Size(69, 24);
-        btnSync.TabIndex = 3;
-        btnSync.Text = "Sync";
-        btnSync.UseVisualStyleBackColor = true;
-        btnSync.Click += button1_Click;
         // 
         // statusImage
         // 
@@ -250,6 +266,7 @@ partial class InstanceInfoDisplay
         Name = "InstanceInfoDisplay";
         Size = new Size(551, 382);
         Load += InstanceInfoDisplay_Load;
+        contextMenu.ResumeLayout(false);
         ((System.ComponentModel.ISupportInitialize)instanceStatusInfoBindingSource).EndInit();
         panelActions.ResumeLayout(false);
         panelActions.PerformLayout();
@@ -266,7 +283,7 @@ partial class InstanceInfoDisplay
     #endregion
 
     private Button openButton;
-    private Label labelInstanceName;
+    private LinkLabel labelInstanceName;
     private BindingSource instanceStatusInfoBindingSource;
     private Panel panelActions;
     private Panel panelArrayStatus;
@@ -276,9 +293,11 @@ partial class InstanceInfoDisplay
     private Label labelTextBad;
     private Label labelTextUnsynched;
     private Label labelValueUnsynced;
-    private Button btnSync;
     private Panel panelTaskStatus;
     private TableLayoutPanel tableLayoutPanel2;
     private Label labelTaskName;
     private ProgressBar taskProgressBar;
+    private ContextMenuStrip contextMenu;
+    private ToolStripMenuItem toolStripMenuItemMaintenance;
+    private ToolStripMenuItem toolStripMenuItemDashboard;
 }

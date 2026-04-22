@@ -24,24 +24,7 @@ public partial class InstanceInfoDisplay : UserControl
 
     private void openButton_Click(object sender, EventArgs e)
     {
-        var url = Instance?.Address;
-        if (string.IsNullOrWhiteSpace(url))
-        {
-            return;
-        }
-
-        try
-        {
-            Process.Start(new ProcessStartInfo
-            {
-                FileName = url,
-                UseShellExecute = true,
-            });
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show($"Unable to open '{url}': {ex.Message}", "Open", MessageBoxButtons.OK, MessageBoxIcon.Error);
-        }
+        contextMenu.Show(openButton, new Point(0, 0), ToolStripDropDownDirection.BelowLeft);
     }
 
     private void labelInstanceName_Click(object sender, EventArgs e)
@@ -58,7 +41,7 @@ public partial class InstanceInfoDisplay : UserControl
         {
             panelTaskStatus.Visible = true;
             panelArrayStatus.Visible = false;
-            btnSync.Enabled = false;
+            toolStripMenuItemMaintenance.Enabled = false;
 
 
             labelTaskName.Text = Instance.Status.CurrentCommand.ToActionName();
@@ -77,8 +60,7 @@ public partial class InstanceInfoDisplay : UserControl
         {
             panelTaskStatus.Visible = false;
             panelArrayStatus.Visible = true;
-
-            btnSync.Enabled = true;
+            toolStripMenuItemMaintenance.Enabled = true;
         }
 
         statusImage.Image = Instance.Status.Health switch
@@ -102,12 +84,6 @@ public partial class InstanceInfoDisplay : UserControl
         }
     }
 
-    private async void button1_Click(object sender, EventArgs e)
-    {
-        btnSync.Enabled = false;
-        await Instance.StartMaintenance();
-    }
-
     private void instanceStatusInfoBindingSource_CurrentItemChanged(object sender, EventArgs e)
     {
         if (InvokeRequired)
@@ -118,5 +94,42 @@ public partial class InstanceInfoDisplay : UserControl
         {
             updateUi();
         }
+    }
+
+    private void openDashboard()
+    {
+        var url = Instance?.Address;
+        if (string.IsNullOrWhiteSpace(url))
+        {
+            return;
+        }
+
+        try
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = url,
+                UseShellExecute = true,
+            });
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Unable to open '{url}': {ex.Message}", "Open", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
+    private void toolStripMenuItemDashboard_Click(object sender, EventArgs e)
+    {
+        openDashboard();
+    }
+
+    private async void toolStripMenuItemMaintenance_Click(object sender, EventArgs e)
+    {
+        await Instance.StartMaintenance(supressNotification: true);
+    }
+
+    private void labelInstanceName_LinkClicked(object sender, LinkLabelLinkClickedEventArgs e)
+    {
+        openDashboard();
     }
 }

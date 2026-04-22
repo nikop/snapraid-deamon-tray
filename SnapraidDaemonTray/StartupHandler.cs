@@ -4,7 +4,7 @@ using SnapraidDaemonTray.Instances;
 
 namespace SnapraidDaemonTray;
 
-internal partial class StartupHandler(InstanceManager instanceManager) : BackgroundService
+internal partial class StartupHandler(InstanceManager instanceManager, SystemTray systemTray) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -19,7 +19,7 @@ internal partial class StartupHandler(InstanceManager instanceManager) : Backgro
 
         if (isLaunchedByNotification)
         {
-            // TODO: Start with UI visible
+            await systemTray.OpenTrayPopup();
         }
     }
 }

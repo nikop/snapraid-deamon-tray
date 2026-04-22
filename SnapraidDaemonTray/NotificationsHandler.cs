@@ -11,7 +11,7 @@ using SnapraidDaemonTray.Instances;
 
 namespace SnapraidDaemonTray;
 
-public class NotificationsHandler(ILogger<NotificationsHandler> logger) : IWinFormsService
+public class NotificationsHandler(ILogger<NotificationsHandler> logger, SystemTray systemTray) : IWinFormsService
 {
 #if DEBUG
     public const string AppDisplayName = "Snapraid Daemon Tray (Debug)";
@@ -23,9 +23,9 @@ public class NotificationsHandler(ILogger<NotificationsHandler> logger) : IWinFo
 
     public void Initialize()
     {
-        AppNotificationManager.Default.NotificationInvoked += (sender, e) =>
+        AppNotificationManager.Default.NotificationInvoked += async (sender, e) =>
         {
-            // TODO
+            await systemTray.OpenTrayPopup();
         };
         AppNotificationManager.Default.Register(AppDisplayName, new Uri(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Icons", "tray.ico")));
     }

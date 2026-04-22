@@ -91,6 +91,40 @@ public class SystemTray(IHostApplicationLifetime lifetime, IServiceProvider serv
             await StartMaintenance();
         });
 
+        contextMenuStrip.Items.Add("Edit Configuration", null, (sender, e) =>
+        {
+            // Open config editor in a new scope
+            if (_trayScope is not null)
+            {
+                return;
+            }
+
+            _trayScope = serviceProvider.CreateScope();
+
+            winFormsContext.Dispatcher.InvokeAsync(() =>
+            {
+                try
+                {
+                    var editor = _trayScope.ServiceProvider.GetRequiredService<Forms.ConfigEditor>();
+                    editor.Show();
+                    editor.FormClosed += (s, ev) =>
+                    {
+                        Task.Run(async () =>
+                        {
+                            await Task.Delay(500);
+                            _trayScope.Dispose();
+                            _trayScope = null;
+                        });
+                    };
+                }
+                catch
+                {
+                    _trayScope.Dispose();
+                    _trayScope = null;
+                }
+            });
+        });
+
         contextMenuStrip.Items.Add("Exit", null, (sender, e) =>
         {
             systemTray.Visible = false;

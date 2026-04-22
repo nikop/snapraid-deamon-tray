@@ -5,6 +5,7 @@ using Microsoft.Extensions.Hosting;
 
 using SnapraidDaemonTray;
 using SnapraidDaemonTray.Instances;
+using SnapraidDaemonTray.Forms;
 
 var builder = Host.CreateApplicationBuilder(args);
 
@@ -21,6 +22,7 @@ builder.Services.AddSingleton<InstanceManager>();
 builder.Services.AddWinFormsService<SystemTray>();
 builder.Services.AddWinFormsService<NotificationsHandler>();
 builder.Services.AddTransient<TrayInfoPopup>();
+builder.Services.AddTransient<ConfigEditor>();
 
 builder.Services.AddHostedService<StartupHandler>();
 builder.Services.AddHostedService<StatusPoller>();

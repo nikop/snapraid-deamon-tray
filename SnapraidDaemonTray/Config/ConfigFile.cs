@@ -1,6 +1,8 @@
-﻿namespace SnapraidDaemonTray.Config;
+﻿using System.Collections.Generic;
+
+namespace SnapraidDaemonTray.Config;
 
 public class ConfigFile
 {
-    public ConfigFileServer[] Servers { get; set; } = [];
+    public List<ConfigFileServer> Servers { get; set; } = new List<ConfigFileServer>();
 }

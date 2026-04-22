@@ -46,14 +46,15 @@ public class AppConfiguration
 
         appConfig = new ConfigFile
         {
-            Servers = [
+            Servers = new System.Collections.Generic.List<ConfigFileServer>
+            {
                 new ConfigFileServer
                 {
                     Enabled = true,
                     Name = "Default",
                     Address = "http://127.0.0.1:7627/",
                 }
-            ]
+            }
         };
 
         var json = JsonSerializer.Serialize(appConfig, jsonSerializerOptions);
@@ -72,5 +73,18 @@ public class AppConfiguration
         _lock.Release();
 
         return ActiveConfig;
+    }
+
+    public async Task SaveConfig(ConfigFile config)
+    {
+        await _lock.WaitAsync();
+
+        var json = JsonSerializer.Serialize(config, jsonSerializerOptions);
+
+        await File.WriteAllTextAsync(ConfigFile.FullName, json);
+
+        ActiveConfig = config;
+
+        _lock.Release();
     }
 }

@@ -4,7 +4,7 @@ using SnapraidDaemonTray.Instances;
 
 namespace SnapraidDaemonTray;
 
-internal partial class StatusPoller(SystemTray systemTray, InstanceManager intanceManager) : BackgroundService
+internal partial class StatusPoller(SystemTray systemTray, InstanceManager instanceManager) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -15,11 +15,13 @@ internal partial class StatusPoller(SystemTray systemTray, InstanceManager intan
             while (await timer.WaitForNextTickAsync(stoppingToken))
             {
                 systemTray.Update();
-                await intanceManager.UpdateInstances();
+                await instanceManager.UpdateInstances();
             }
         }
         catch (OperationCanceledException)
         {
         }
+
+
     }
 }

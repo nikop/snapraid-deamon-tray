@@ -1,0 +1,2203 @@
+openapi: 3.1.0
+info:
+  title: SnapRAID API
+  description: Backend API for SnapRAID monitoring and control.
+  license:
+    name: BSD-2-Clause
+    url: https://opensource.org/licenses/BSD-2-Clause
+  version: 1.0.0
+servers:
+  - url: /
+
+paths:
+  /snapraid/v1/maintenance:
+    post:
+      summary: Trigger full maintenance sequence
+      description: >
+        Initiates the automated maintenance workflow, executing 'up', 'sync',
+        and 'scrub'. The process is concluded by a 'report' task to notify the
+        result.
+
+        This operation is subject to all safety thresholds defined in the
+        daemon configuration, specifically 'sync_threshold_deletes' and
+        'sync_threshold_updates'.
+
+        If the 'sync' phase exceeds the delete threshold, the daemon will
+        suspend the 'sync' task to prevent accidental data loss.
+        Regardless, the 'scrub' phase is not bypassed.
+
+        This is an asynchronous operation. Monitor progress via the
+        /activity endpoint.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommandRequest'
+      responses:
+        '202':
+          description: Task scheduled.
+          $ref: '#/components/responses/CommandResult'
+        '400':
+          description: Invalid request body.
+          $ref: '#/components/responses/CommandResult'
+        '405':
+          description: Invalid method.
+          $ref: '#/components/responses/CommandResult'
+        '500':
+          description: Engine not found.
+          $ref: '#/components/responses/CommandResult'
+
+  /snapraid/v1/hold_off:
+    post:
+      summary: 'Hold off next maintenance'
+      description: >
+        Controls the one-shot skip state for the next scheduled
+        maintenance task. If enabled, the immediate next
+        scheduled maintenance window is bypassed. The system will
+        automatically reset this state to disabled once a
+        scheduled task has been skipped.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                enabled:
+                  type: boolean
+                  description: >
+                    Set to true to enable the hold-off state.
+                    Set to false to resume the normal
+                    maintenance schedule.
+      responses:
+        '200':
+          description: 'Hold-off state updated successfully'
+          $ref: '#/components/responses/CommandResult'
+        '400':
+          description: Invalid request body.
+          $ref: '#/components/responses/CommandResult'
+        '405':
+          description: Invalid method.
+          $ref: '#/components/responses/CommandResult'
+
+  /snapraid/v1/heal:
+    post:
+      summary: Execute automated silent error recovery sequence
+      description: >
+        Initiates a recovery operation to resolve data corruption by
+        executing 'up', followed by 'fix -e', and followed by 'scrub -p bad'.
+        The process is concluded by a 'report' task to notify the result.
+
+        The '-e fix' command utilizes parity data to reconstruct blocks
+        marked as having silent errors (checksum mismatches) and
+        restores the physical files on the data disks.
+
+        The '-p bad scrub' command performs a targeted re-verification
+        of known 'bad' blocks. If the fix was successful, it clears the
+        error entries from the content file, resetting the health
+        status of the array.
+
+        This is an asynchronous operation. Monitor progress via the
+        /activity endpoint.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommandRequest'
+      responses:
+        '202':
+          description: Task scheduled.
+          $ref: '#/components/responses/CommandResult'
+        '400':
+          description: Invalid request body.
+          $ref: '#/components/responses/CommandResult'
+        '405':
+          description: Invalid method.
+          $ref: '#/components/responses/CommandResult'
+        '500':
+          description: Engine not found.
+          $ref: '#/components/responses/CommandResult'
+
+  /snapraid/v1/undelete:
+    post:
+      summary: Recover missing or accidentally deleted files
+      description: >
+        Initiates a restoration process for files that are present in the
+        parity but missing from the physical data disks by executing
+        'up', followed by 'fix -m'. The process is concluded by a 'report'
+        task to notify the result.
+
+        The '-m' flag ensures that only missing files are reconstructed.
+        Existing files are never overwritten or modified.
+
+        The request accepts an optional list of filters to narrow the
+        scope of restoration to specific directories or file patterns.
+        If no filter is provided, the daemon attempts to recover all
+        missing files across the entire array.
+
+        This is an asynchronous operation. Monitor progress via the
+        /activity endpoint.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommandRequest'
+      responses:
+        '202':
+          description: Task scheduled.
+          $ref: '#/components/responses/CommandResult'
+        '400':
+          description: Invalid request body.
+          $ref: '#/components/responses/CommandResult'
+        '405':
+          description: Invalid method.
+          $ref: '#/components/responses/CommandResult'
+        '500':
+          description: Engine not found.
+          $ref: '#/components/responses/CommandResult'
+
+  /snapraid/v1/suspend_idle:
+    post:
+      summary: Conditional spindown of idle disks
+      description: >
+        Initiates an automated power management sequence to transition inactive
+        disks into a low-power standby state.
+
+        The workflow begins by executing a 'probe' task to refresh the
+        real-time activity metrics for all disks. This operation is
+        non-intrusive and will not wake disks that are already in standby.
+
+        Following the probe, the daemon identifies disks whose idle duration
+        exceeds the 'spindown_idle_minutes' configuration threshold and
+        issues a targeted 'down_idle' command to those specific devices.
+
+        This is an asynchronous operation. Monitor progress and view the
+        resulting command sequence via the /activity endpoint.
+      responses:
+        '202':
+          description: Task scheduled.
+          $ref: '#/components/responses/CommandResult'
+        '500':
+          description: Engine not found.
+          $ref: '#/components/responses/CommandResult'
+
+  /snapraid/v1/refresh:
+    post:
+      summary: Refresh array state from content files
+      description: >
+        Forces the daemon to re-synchronize its internal state with the
+        content file. This is intended for use after manual interventions
+        performed outside the daemon interface (e.g., replacing
+        a failed disk, fixing UUID mismatches, or manually updating configuration).
+
+        The operation executes a 'read' task to load the current content file
+        data, followed by a 'report' task to evaluate and broadcast the
+        resulting array health.
+
+        This is specifically useful for clearing 'FAILING' or 'PREFAIL' modes
+        once the underlying hardware or configuration issues have been
+        resolved manually.
+
+        This is an asynchronous operation. Monitor progress via the
+        /activity endpoint.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommandRequest'
+      responses:
+        '202':
+          description: Task scheduled.
+          $ref: '#/components/responses/CommandResult'
+        '400':
+          description: Invalid request body.
+          $ref: '#/components/responses/CommandResult'
+        '405':
+          description: Invalid method.
+          $ref: '#/components/responses/CommandResult'
+        '500':
+          description: Engine not found.
+          $ref: '#/components/responses/CommandResult'
+
+  /snapraid/v1/schedule:
+    post:
+      summary: Schedule a sequence of commands
+      description: >
+        Queues one or more SnapRAID CLI commands to be executed sequentially in a single session.
+
+        Execution Logic:
+        - Commands are executed in the exact order provided in the 'tasks' array.
+        - If a command fails, all subsequent tasks in the queue are automatically
+          cancelled to prevent operating on inconsistent data.
+        - Exception: The 'report' and 'down' commands are treated as finalizers.
+          If they are present in the sequence, they will be executed regardless
+          of the success or failure of preceding commands.
+
+        Clients should monitor /state endpoint to track the progress of the
+        currently active command and the overall queue status via pulse counters.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - tasks
+              properties:
+                tasks:
+                  type: array
+                  minItems: 1
+                  items:
+                    $ref: '#/components/schemas/TaskSchedule'
+      responses:
+        '202':
+          description: Task scheduled.
+          $ref: '#/components/responses/CommandResult'
+        '400':
+          description: Invalid request body.
+          $ref: '#/components/responses/CommandResult'
+        '405':
+          description: Invalid method.
+          $ref: '#/components/responses/CommandResult'
+        '500':
+          description: Engine not found.
+          $ref: '#/components/responses/CommandResult'
+
+  /snapraid/v1/stop:
+    post:
+      summary: Stop active task
+      description: >
+        Terminates the currently running SnapRAID CLI task (scrub, sync, etc.) by
+        sending a SIGTERM signal to the process.
+
+        This command is synchronous in the sense that it returns only after
+        the signal has been successfully sent. However, the actual termination
+        of the SnapRAID CLI process may take a few seconds to complete gracefully.
+
+        Note that the hook_script is never terminated.
+      responses:
+        '202':
+          description: Stop signal scheduled.
+          $ref: '#/components/responses/CommandStopped'
+        '400':
+          description: Invalid request body.
+          $ref: '#/components/responses/CommandResult'
+        '405':
+          description: Invalid method.
+          $ref: '#/components/responses/CommandResult'
+        '409':
+          description: No task is currently running.
+          $ref: '#/components/responses/CommandResult'
+        '500':
+          description: Failed to send termination signal to the process group.
+          $ref: '#/components/responses/CommandResult'
+
+  /snapraid/v1/state:
+    get:
+      summary: Lightweight state change detection
+      description: >
+        Returns the current high-level state of the daemon, including health
+        status, the currently active command, and monotonic pulse counters.
+
+        This endpoint is designed for high-frequency polling by lightweight
+        clients, such as desktop status bars or system monitors. It provides
+        enough information to display a "live" summary without fetching heavy
+        datasets.
+
+        The pulse object contains counters used for cache invalidation. Each
+        field corresponds directly to a data-heavy API entry point.
+
+        If a counter has not changed since the last request, the corresponding
+        entry point is guaranteed to return the same data. If a counter is
+        different, the underlying subsystem state has evolved, and the entry
+        point will potentially return updated information.
+
+        Note that the counters are not necessarily monotonically increasing
+        because they are reset if the daemon restarts. You should compare
+        them only for equality.
+      responses:
+        '200':
+          description: 'Current subsystem pulse counters.'
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - pulse
+                  - health
+                properties:
+                  pulse:
+                    $ref: '#/components/schemas/Pulse'
+                  health:
+                    type: string
+                    enum: [passed, corrupt, prefail, failing, pending]
+                    description: >
+                      The aggregate health of the entire array.
+
+                      * passed: All member devices are nominal, and no data
+                        inconsistencies are detected.
+                      * corrupt: This is triggered by the presence of silent
+                        data errors, specifically if the 'blocks_bad' counter
+                        is greater than zero.
+                      * prefail: A critical state indicating that one or more
+                        underlying devices have encountered I/O failures, or a
+                        SMART prefail condition.
+                      * failing: A critical state indicating that one or more
+                        underlying devices have encountered a SMART failing
+                        condition.
+                      * pending: The aggregate health has not yet been
+                        determined.
+                  health_reason:
+                    type: string
+                    description: >
+                      A human-readable string explaining the current health state.
+                      This provides the specific cause when health is 'corrupt',
+                      'prefail' or 'failing' (e.g., "Disk 'd1' reporting SMART errors").
+                      This field is omitted if the array is healthy.
+                  active_command:
+                    type: string
+                    enum: [probe, up, down, smart, diff, sync, scrub, check, fix, report, down_idle]
+                    description: >
+                      The name of the currently running command.
+                      Omitted from the response if the daemon is idle.
+                  next_command:
+                    type: string
+                    enum: [probe, up, down, smart, diff, sync, scrub, check, fix, report, down_idle]
+                    description: >
+                      The next command scheduled in the current execution sequence.
+                      This field is present when the daemon is running an automated
+                      workflow and there are pending steps remaining in the queue.
+                      If no subsequent task is queued, this field is omitted.
+                  progress:
+                    type: integer
+                    minimum: 0
+                    maximum: 100
+                    description: >
+                      The completion percentage of the active command (0-100).
+
+                      This field is omitted if the daemon is idle, or if the
+                      currently running command does not provide granular
+                      progress telemetry (e.g., 'up' or 'smart').
+                  eta_seconds:
+                    type: integer
+                    description: >
+                      Estimated seconds remaining until the active command completes.
+
+                      This field is omitted if the daemon is idle, or if an
+                      estimate is not yet available/supported for the current task.
+        '400':
+          description: Invalid request body.
+          $ref: '#/components/responses/CommandResult'
+        '405':
+          description: Invalid method.
+          $ref: '#/components/responses/CommandResult'
+
+  /snapraid/v1/disks:
+    get:
+      summary: Get cached disk inventory and status
+      description: >
+        Returns a comprehensive report of all data and parity disks managed
+        by the daemon.
+
+        This is a passive operation that retrieves the most recent
+        information stored in memory. Calling this endpoint will NOT trigger
+        a physical disk probe or spin up any standby disks.
+      responses:
+        '200':
+          description: Successfully retrieved disk state lists.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  pulse:
+                    $ref: '#/components/schemas/Pulse'
+                  data_disks:
+                    type: array
+                    description: 'Ordered list of data disks (d1, d2, ...)'
+                    items:
+                      $ref: '#/components/schemas/Disk'
+                  parity_disks:
+                    type: array
+                    description: 'Ordered list of parity disks (parity, 2-parity, ...)'
+                    items:
+                      $ref: '#/components/schemas/Disk'
+                  extra_disks:
+                    type: array
+                    description: 'Ordered list of extra disks (boot, data, ...)'
+                    items:
+                      $ref: '#/components/schemas/Disk'
+        '400':
+          description: Invalid request body.
+          $ref: '#/components/responses/CommandResult'
+        '405':
+          description: Invalid method.
+          $ref: '#/components/responses/CommandResult'
+
+  /snapraid/v1/activity:
+    get:
+      summary: Get active or latest task telemetry
+      description: >
+        Retrieves the real-time status of the currently executing task,
+        including progress percentage, throughput, and estimated time
+        remaining.
+
+        If the system is idle, this endpoint returns the final telemetry
+        report of the most recently completed task (specifically those
+        with a 'terminated' or 'signaled' status).
+
+        Note that 'cancelled' tasks—which occur when a task in a sequence
+        is skipped due to a prior failure or safety threshold trigger—never
+        appear in this endpoint. Such tasks transition directly from the
+        queue to the persistent history without becoming 'active'.
+
+        Returns 204 No Content if the daemon has not initiated any tasks
+        since the last service restart.
+      responses:
+        '200':
+          description: Active or latest task state retrieved.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  pulse:
+                    $ref: '#/components/schemas/Pulse'
+                allOf:
+                  - $ref: '#/components/schemas/Task'
+        '204':
+          description: No task available (system idle since startup).
+        '400':
+          description: Invalid request body.
+          $ref: '#/components/responses/CommandResult'
+        '405':
+          description: Invalid method.
+          $ref: '#/components/responses/CommandResult'
+
+  /snapraid/v1/tasks:
+    get:
+      summary: Retrieve global task lifecycle state
+      description: >
+        Provides a holistic, unified view of the SnapRAID Daemon workload.
+        Tasks are categorized by their current state in the execution pipeline.
+
+        The 'active' field is returned as an array. In the current version of the
+        daemon, this array will contain at most one task. If no task is
+        currently executing, the array will be empty.
+      responses:
+        '200':
+          description: Successfully retrieved the global task collection.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  pulse:
+                    $ref: '#/components/schemas/Pulse'
+                  pending:
+                    type: array
+                    description: >
+                      Tasks waiting in the sequential queue.
+                    items:
+                      $ref: '#/components/schemas/Task'
+                  active:
+                    type: array
+                    description: >
+                      The task(s) currently being processed. Returns an empty
+                      list if the system is idle.
+                    maxItems: 1
+                    items:
+                      $ref: '#/components/schemas/Task'
+                  history:
+                    type: array
+                    description: >
+                      Chronological record of completed tasks.
+                    items:
+                      $ref: '#/components/schemas/Task'
+        '400':
+          description: Invalid request body.
+          $ref: '#/components/responses/CommandResult'
+        '405':
+          description: Invalid method.
+          $ref: '#/components/responses/CommandResult'
+
+  /snapraid/v1/config:
+    get:
+      summary: Retrieve active daemon configuration
+      description: >
+        Returns the current operational parameters of the daemon. This includes
+        settings parsed from 'snapraidd.conf' as well as any overrides applied
+        during the current session.
+      responses:
+        '200':
+          description: Configuration retrieved successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  pulse:
+                    $ref: '#/components/schemas/Pulse'
+                allOf:
+                  - $ref: '#/components/schemas/Config'
+        '400':
+          description: Invalid request body.
+          $ref: '#/components/responses/CommandResult'
+        '405':
+          description: Invalid method.
+          $ref: '#/components/responses/CommandResult'
+
+    patch:
+      summary: Update configuration (Permanent)
+      description: >
+        Performs a partial update of the daemon settings. Validated changes are
+        immediately applied to the running process and persisted to the
+        'snapraidd.conf' file on disk.
+      requestBody:
+        required: true
+        description: JSON object containing the fields to be updated.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Config'
+      responses:
+        '200':
+          description: Configuration updated and persisted to disk.
+          $ref: '#/components/responses/CommandResult'
+        '400':
+          description: >
+            Invalid configuration. One or more values failed validation (e.g.,
+            unsupported log level or out-of-range scrub frequency).
+
+            Updates are processed sequentially. All configuration options provided
+            before the one that caused the issue are successfully set. All options
+            appearing after the failing field are not processed and remain unchanged.
+          $ref: '#/components/responses/CommandResult'
+        '403':
+          description: >
+            The server understood the request but refuses to authorize the
+            modification of the specified configuration parameters.
+
+            Updates are processed sequentially. All configuration options provided
+            before the one that caused the issue are successfully set. All options
+            appearing after the failing field are not processed and remain unchanged.
+          $ref: '#/components/responses/CommandResult'
+        '405':
+          description: Invalid method.
+          $ref: '#/components/responses/CommandResult'
+
+  /snapraid/v1/array:
+    get:
+      summary: Get array metadata and delta statistics
+      description: >
+        Returns the top-level logical state of the array. This includes
+        software versioning, SnapRAID CLI block configuration, and the
+        timestamps of the most recent maintenance tasks.
+
+        The 'diff' statistics represent the drift between the actual
+        files on disk and the parity information, as recorded during
+        the last array check.
+      responses:
+        '200':
+          description: Global array information retrieved successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  pulse:
+                    $ref: '#/components/schemas/Pulse'
+                allOf:
+                  - $ref: '#/components/schemas/Array'
+
+  /snapraid/v1/system:
+    get:
+      summary: Get host system information
+      description: >
+        Returns hardware and OS details.
+      responses:
+        '200':
+          description: System information retrieved successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/System'
+        '400':
+          description: Invalid request body.
+          $ref: '#/components/responses/CommandResult'
+        '405':
+          description: Invalid method.
+          $ref: '#/components/responses/CommandResult'
+
+
+components:
+  responses:
+    CommandResult:
+      description: >
+        The request was successfully validated and added to the execution queue or failed.
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - success
+            properties:
+              success:
+                type: boolean
+                example: true
+                description: >
+                  Indicates if the operation was successfully added to the daemon's
+                  internal worker queue
+              message:
+                type: string
+                example: 'Operation completed successfully.'
+                description: >
+                  A human-readable status message or error detail.
+
+    CommandStopped:
+      description: >
+        The stop command was successfully executed.
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - success
+              - number
+              - pid
+            properties:
+              success:
+                type: boolean
+                example: true
+                description: >
+                  Indicates if the operation was successful.
+              message:
+                type: string
+                example: 'Signal sent.'
+                description: >
+                  A human-readable status message.
+              number:
+                type: integer
+                example: 1
+                description: >
+                  Number of the task stopped.
+              pid:
+                type: integer
+                example: 12345
+                description: >
+                  Process ID of the task stopped.
+
+  schemas:
+    ValueHistory:
+      type: object
+      description: >
+        Historical metadata and change tracking for a parent value.
+        The entire object is omitted if the value has never changed
+        since the daemon started.
+      properties:
+        prev:
+          type: integer
+          format: int64
+          description: >
+            The immediate previous value held before the latest change.
+        prev_at:
+          type: string
+          example: '2026-02-26T10:30:00'
+          description: >
+            The timestamp when the value transitioned from 'prev'
+            to the current value.
+        lowest:
+          type: integer
+          format: int64
+          description: >
+            The historical minimum value observed by the daemon.
+        lowest_at:
+          type: string
+          example: '2026-02-20T14:15:00'
+          description: >
+            The timestamp of the most recent occurrence where
+            the value reached the 'lowest' record.
+
+    CommandRequest:
+      type: object
+      description: >
+        Optional configuration for the task.
+      properties:
+        filters:
+          type: array
+          items:
+            type: string
+          description: >
+            Optional filters (e.g., 'dir/', '*.txt') to limit the
+            restoration scope. Each item corresponds to a '-f'
+            argument in the SnapRAID CLI.
+            Valid only for `undelete`.
+        ignore_thresholds:
+          type: boolean
+          default: false
+          description: >
+            If true, the maintenance task will ignore any configured
+            thresholds and proceed with the sync commands.
+            Valid only for `maintenance`.
+        spindown_on_finish:
+          type: boolean
+          default: false
+          description: >
+            If true, the daemon will command all disks in the array to enter
+            STANDBY mode once the task finishes succesfully or fails.
+
+    TaskSchedule:
+      type: object
+      required:
+        - command
+      properties:
+        command:
+          type: string
+          description: 'The SnapRAID CLI action to perform.'
+          oneOf:
+            - const: probe
+              description: >
+                Verifies the power status of all configured disks, and gathers.
+                SMART information and attributes for the ones already spinning.
+            - const: up
+              description: >
+                Spins up all drives in the array.
+            - const: down
+              description: >
+                Spins down array drives to save power.
+            - const: smart
+              description: >
+                Collects and parses SMART attributes for physical health assessment.
+            - const: diff
+              description: >
+                Identifies changed, added, or deleted files since the last sync.
+            - const: sync
+              description: >
+                Updates parity to match current data disk state.
+            - const: scrub
+              description: >
+                Verifies data/parity integrity by recalculating checksums.
+            - const: check
+              description: >
+                Full verification of array integrity (read-only).
+            - const: fix
+              description: >
+                Recovers deleted files or repairs corruption using parity.
+            - const: report
+              description: >
+                Generates a full summary of last operations and statistics.
+            - const: down_idle
+              description: >
+                Executes a conditional spindown operation of the disks that
+                have exceeded the 'spindown_idle_minutes' threshold.
+        args:
+          type: array
+          items:
+            type: string
+          description: >
+            Optional arguments for the command.
+
+    Pulse:
+      type: object
+      description: >
+        A collection of monotonic sequence counters used for state change detection.
+        Each field corresponds directly to the API entry point of the same name.
+
+        If a specific pulse field increments, the corresponding endpoint will
+        potentially return different data. Clients should use these counters
+        to trigger selective cache invalidation.
+      properties:
+        current_at:
+          type: string
+          example: '2026-01-12T08:00:00'
+          description: >
+            The current local system time of the server.
+            This acts as the master reference point for the client to
+            synchronize its local display and calculate the relative
+            age of other data points within the payload.
+        array:
+          type: integer
+          format: int64
+          description: >
+            Related to the /array entry point.
+
+            Increments when the physical state of the data array changes.
+            A change here indicates that the data returned by /array
+            has potentially been updated.
+        config:
+          type: integer
+          format: int64
+          description: >
+            Related to the /config entry point.
+
+            Increments when the SnapRAID Daemon configuration is altered.
+            A change here indicates that the data returned by /config
+            has potentially been updated.
+        disks:
+          type: integer
+          format: int64
+          description: >
+            Related to the /disks entry point.
+
+            Increments when the state of any disk in the array is updated.
+            A change here indicates that the data returned by /disks
+            has potentially been updated.
+        tasks:
+          type: integer
+          format: int64
+          description: >
+            Related to the /tasks entry point.
+
+            Increments whenever any background task changes its lifecycle state.
+            A change here indicates that the data returned by /tasks
+            has potentially been updated.
+        activity:
+          type: integer
+          format: int64
+          description: >
+            Related to the /activity entry point.
+
+            Increments whenever the running task changes its attributes.
+            A change here indicates that the data returned by /activity
+            has potentially been updated.
+
+    Message:
+      type: object
+      description: >
+        A structured log message emitted during task execution,
+        categorized by both severity and the nature of the event.
+      required:
+        - level
+        - text
+      properties:
+        level:
+          type: string
+          enum: [fatal, error, info, verbose]
+          description: >
+            Defines the impact on the current process:
+            - **fatal**: Fatal error, the task stopped immediately.
+            - **error**: Significant issue, but the task attempted to continue.
+            - **info**: General telemetry and progress updates.
+            - **verbose**: Verbose information.
+        type:
+          type: string
+          enum: [hardware, soft]
+          description: >
+            Categorizes the root cause of the message.
+            This field is **optional** and is only present for 'fatal' and 'error' levels:
+            - **hardware**: Physical failures (disk Input/Output failure, silent data error).
+            - **soft**: Logic-based anomalies (modified files during sync).
+        text:
+          type: string
+          description: >
+            The human-readable description of the event.
+
+    Task:
+      type: object
+      description: >
+        Progress status of the running or latest command. Persists until a new command begins.
+      required:
+        - number
+        - command
+        - health
+        - status
+        - messages
+      properties:
+        number:
+          type: integer
+          description: >
+            The incremental number of task. It can be used to identify tasks
+            when moved from queue to process to history.
+        command:
+          type: string
+          enum: [probe, up, down, smart, diff, sync, scrub, check, fix, report, down_idle]
+          description: >
+            The command executed.
+        high_command:
+          type: string
+          enum: [maintenance, heal, undelete, suspend_idle]
+          description: >
+            The high level command that triggered this command.
+        health:
+          type: string
+          enum: [passed, corrupt, prefail, failing, pending]
+          description: >
+            The operational health of the task, dynamically derived from
+            the execution results and exit codes.
+
+            * passed: The task completed without hardware errors. This
+              includes runs with 'soft' errors (e.g., files modified or moved
+              during execution) which do not compromise parity integrity.
+            * corrupt: The task detected 'silent data errors'.
+              This indicates data corruption that requires a heal' operation,
+              but does not necessarily imply physical hardware failure.
+            * prefail: The task encountered physical I/O errors.
+            * failing: The task encountered failing errors like disks missing.
+            * pending: The task is currently queued or running and
+              has not yet produced a final health result.
+        status:
+          type: string
+          enum: [queued, starting, processing, finalizing, stopping, terminated, signaled, canceled]
+          description: >
+            The current status of the task:
+            queued - Waiting to be executed.
+            starting - The task started and it's executing its initialization phase, like loading the content file.
+            processing - The task is executing and you'll get progress information like `percentage`.
+            finalizing - The task finished and it's doing the final phase, like saving the content file.
+            stopping - The task received a signal, and it is performing the final phase.
+            terminated - The task terminated, `exit_code` contains its return code.
+            signaled - The task terminated by a signal. `exit_sig` contains its signal code.
+            canceled - The task was never executed because a previous operation failed.
+              For example, a canceled scrub because the previous sync failed.
+              `exit_msg` contains the reason for the cancellation.
+        exit_code:
+          type: integer
+          description: >
+            Process exit code. Present only with status=terminated.
+        exit_sig:
+          type: integer
+          description: >
+            Process signal code. Present only with status=signaled.
+        exit_msg:
+          type: string
+          description: >
+            Reason for task cancellation. Present only with status=canceled.
+            This field describes either a failed dependency in a task sequence (e.g., sync failed
+            so scrub was skipped) or a safety suspension (e.g., sync_threshold_deletes reached).
+        scheduled_at:
+          type: string
+          example: '2026-01-12T08:00:00'
+          description: >
+            The time when the task was added to the queue.
+            This timestamp is in local time.
+        started_at:
+          type: string
+          example: '2026-01-12T08:00:00'
+          description: >
+            The server time when the task moved from 'queued' to 'starting'.
+            This timestamp is in local time.
+        finished_at:
+          type: string
+          example: '2026-01-12T08:00:00'
+          description: >
+            The server time when the task reached a terminal state
+            (terminated, signaled, or canceled).
+            This timestamp is in local time.
+        progress:
+          type: integer
+          description: >
+            Completion percentage. Only in 'processing'.
+        eta_seconds:
+          type: integer
+          description: >
+            Estimated time remaining in seconds. Only in 'processing'.
+        speed_mbs:
+          type: integer
+          description: >
+            Realtime speed in Mbytes/s. Only in 'processing'.
+        cpu_usage:
+          type: integer
+          description: >
+            CPU usage percentage. Only in 'processing'.
+        elapsed_seconds:
+          type: integer
+          description: >
+            Elapsed time in seconds. Only in 'processing'.
+        block_begin:
+          type: integer
+          format: int64
+          description: >
+            Starting block index.
+        block_end:
+          type: integer
+          format: int64
+          description: >
+            Ending block index + 1.
+        blocks_count:
+          type: integer
+          format: int64
+          description: >
+            The number of blocks to process.
+            It may be less than block_end - block_begin + 1 if some blocks are going to be skipped
+        block_idx:
+          type: integer
+          format: int64
+          description: >
+            Current block index position processed. Only in 'processing'.
+        blocks_done:
+          type: integer
+          format: int64
+          description: >
+            The count of blocks processed.
+        size_done_bytes:
+          type: integer
+          format: int64
+          description: >
+            Size of blocks processed.
+        log_file:
+          type: string
+          example: '/var/log/snapraid/20260112-sync.log'
+          description: >
+            The absolute path to the log file for this specific task execution.
+            This file is stored in the directory defined by 'sys_log_directory' in the config.
+        report_output:
+          type: string
+          description: >
+            The complete text-based results of a 'report' type tasks.
+
+            For high-level maintenance macros (such as 'maintenance', 'heal',
+            or 'undelete'), the daemon automatically appends a final 'report'
+            command to the task sequence upon successful completion of the
+            primary actions.
+        messages:
+          type: array
+          description: >
+            A chronological collection of messages generated
+            during this task's execution.
+          items:
+            $ref: '#/components/schemas/Message'
+        error_soft:
+          type: integer
+          format: int64
+          example: 0
+          description: >
+            The count of non-fatal logical errors encountered in the task.
+            This tracks transient issues that do not indicate hardware or
+            media failure, such as files being modified or removed.
+            This field is available only on the `sync`, `scrub` and `fix` command.
+        error_io:
+          type: integer
+          format: int64
+          example: 0
+          description: >
+            The count of physical Input/Output errors encountered in the task.
+            This tracks hardware-level failures (disk, cable, or controller)
+            recorded across the task execution.
+            This field is available only on the `sync`, `scrub` and `fix` command.
+        error_data:
+          type: integer
+          format: int64
+          example: 0
+          description: >
+            The count of data integrity errors encountered in the task.
+            This tracks 'silent' errors where a read was physically successful,
+            but the data failed checksum verification, across the task execution.
+            This field is available only on the `sync`, `scrub` and `fix` command.
+        error_unrecoverable:
+          type: integer
+          format: int64
+          example: 0
+          description: >
+            The count of errors that the `fix` command was unable to recover.
+            If this counter is 0 it means that everything was recovered.
+            This field is available only on the `fix` command.
+
+    Device:
+      type: object
+      required:
+        - node
+        - ids
+        - split_index
+        - health
+        - power
+      properties:
+        node:
+          type: string
+          description: >
+            System device path (e.g., /dev/sdb1).
+        ids:
+          type: array
+          description: >
+            A list of unique hardware identifiers associated with
+            the device. This may include the Serial Number, WWN, and
+            UUIDs. These are used to persistently identify the disk
+            regardless of changes to the device node path.
+          items:
+            type: string
+            description: >
+              A unique string identifier (e.g., '6000c294-8173-9f81...',
+              'WDC_WD40EFRX-68N32N0', or 'naa.5000cca25ec1e695').
+        split_index:
+          type: integer
+          description: >
+            The zero-based index of the logical partition within the 'splits' array.
+            This index links the physical device to its specific configuration
+            entry, identifying which mount point or parity file path or data
+            disk mount point resides on this particular hardware block device.
+        health:
+          type: string
+          enum: [passed, prefail, failing, pending]
+          description: >
+            The aggregate health status of the physical hardware device.
+
+            * passed: The device is operating within normal
+              manufacturer specifications with no logged errors.
+            * prefail: The drive has encountered hardware I/O errors or a
+              SMART prefail condition.
+            * failing: The drive has encountered a SMART failing condition.
+            * pending: The health has not yet been determined.
+
+            Note that there is no silent error detection at device level,
+            and the 'corrupt' health state is not possible.
+        power:
+          type: string
+          enum: [active, standby, pending]
+          description: >
+            The current mechanical power state of the physical device.
+
+            * 'active': The disk is spun up and the platters are rotating at
+              full speed. The device is ready for immediate I/O.
+            * 'standby': The disk is spun down (low-power mode). The platters
+              are stationary. Any subsequent I/O will incur a spin-up delay.
+            * 'pending': The power state has not yet been determined. This is
+              the default state upon daemon startup until the first hardware
+              probe is performed.
+        family:
+          type: string
+          example: 'Western Digital Red'
+          description: >
+            Vendor and Model Family.
+        model:
+          type: string
+          example: 'WDC WD40EFRX-68N32N0'
+          description: >
+            Model of the disk.
+        serial:
+          type: string
+          example: 'WD-WCC7K1XN2L3P'
+          description: >
+            Serial of the disk.
+        interface:
+          type: string
+          example: 'USB'
+          description: >
+            Interface of the disk. Typical values are SATA, SCSI, USB, NVMe.
+        size_bytes:
+          type: integer
+          format: int64
+          description: >
+            Size in bytes of the raw device.
+        rotational:
+          type: integer
+          example: 7200
+          description: >
+            The nominal rotation rate of the device in Revolutions Per Minute (RPM).
+            Use this to distinguish between mechanical and solid-state storage:
+            * 0: Non-rotational device (e.g., SSD, NVMe).
+            * 1: Rotational device with an unknown or undetected speed.
+            * >1: The actual detected rotational speed (e.g., 5400, 7200, 10000).
+        error_protocol:
+          type: integer
+          format: int64
+          description: >
+            Counts command, transport, or controller-level errors reported
+            by the device. These reflect failed I/O operations not directly
+            caused by media defects (for example interface, firmware, or
+            power-related errors).
+            This counter is cumulative and never resets to zero, even if
+            the underlying error condition is resolved.
+        error_protocol_history:
+          $ref: '#/components/schemas/ValueHistory'
+        error_medium:
+          type: integer
+          format: int64
+          description: >
+            Counts media-level errors where data could not be reliably
+            read or written. These indicate actual storage surface or
+            flash failures and may imply data loss.
+            This counter is cumulative and never resets to zero, even if
+            the underlying error condition is resolved.
+        error_medium_history:
+          $ref: '#/components/schemas/ValueHistory'
+        wear_level:
+          type: integer
+          description: >
+            The wear level of the SSD/NVME expressed as a percentage, where a
+            value of 0 represents a brand new drive with zero wear and
+            a value of 100 indicates the drive has reached or exceeded its
+            manufacturer-rated design life. This metric is provided as a
+            normalized unsigned integer, offering a consistent health
+            indicator across various SSD/NVME vendors and interface types
+            by mapping diverse hardware counters into a single
+            standardized scale.
+        annual_failure_rate:
+          type: number
+          format: double
+          description: >
+            The Annual Failure Rate (the average number	of failures you expect
+            in a year) computed from the SMART attributes 5, 187, 188, 197, 198.
+        failure_probability:
+          type: number
+          format: double
+          description: >
+            Statistical probability of at least one disk failure within a
+            one-year period, calculated using a Poisson distribution model
+            based on the aggregate Annual Failure Rate.
+        temp_history_24h:
+          type: array
+          minItems: 144
+          maxItems: 144
+          items:
+            type: integer
+          description: >
+            A rolling 24-hour history of temperatures measured
+            every 10 minutes (144 points total).
+            - Value 0: Standby mode
+            - Index 0 is 24h ago; Index 143 is current.
+        smart:
+          type: object
+          description: >
+            The S.M.A.R.T. telemetry and interpreted health analysis for the
+            physical disk.
+
+            This object combines raw attribute counters with boolean flags
+            derived from smartctl exit codes (bitmask 1 << 3 to 1 << 7).
+            It is omitted if the disk is in standby.
+          properties:
+            measured_at:
+              type: string
+              example: '2026-01-12T08:00:00'
+              description: >
+                The timestamp representing the exact moment the S.M.A.R.T.
+                telemetry was captured from the physical disk.
+                This serves as the "heartbeat" for health data, allowing
+                the system to determine the age and relevance of the
+                current diagnostic metrics.
+            attributes:
+              type: array
+              description: >
+                A collection of all S.M.A.R.T. telemetry attributes retrieved
+                from the disk firmware, providing detailed health metrics.
+              items:
+                type: object
+                properties:
+                  name:
+                    type: string
+                    description: >
+                      The technical identifier or human-readable name of the
+                      S.M.A.R.T. attribute (e.g., Power_On_Hours).
+                  critical:
+                    type: boolean
+                    description: >
+                      Indicates if this attribute is a critical indicator of
+                      hardware health. When true, any degradation in this
+                      value should be treated as a high-priority warning,
+                      regardless of whether the 'type' is 'prefail' or 'oldage'.
+                  type:
+                    type: string
+                    enum: [prefail, oldage]
+                    description: >
+                      Indicates if this attribute is a 'pre-fail' indicator
+                      or a 'oldage' informational value.
+                  when_failed:
+                    type: string
+                    enum: [never, now, past]
+                    description: >
+                      The failure history of this specific attribute. 'never' indicates
+                      it has always been within limits; 'now' indicates the attribute
+                      currently exceeds the threshold; 'past' indicates the attribute
+                      was out of limits at some point in the drive's history but has
+                      since returned to a nominal normalized value.
+                  raw:
+                    type: integer
+                    format: int64
+                    description: >
+                      The raw value processed by the daemon.
+                      This is the actual data point (e.g., total hours or
+                      degrees Celsius).
+                  raw_history:
+                    $ref: '#/components/schemas/ValueHistory'
+                  min:
+                    type: integer
+                    description: >
+                      The absolute lifetime minimum recorded by the drive
+                      firmware itself. This is a hardware-persisted
+                      record of the 'raw' value that spans the entire life
+                      of the disk, independent of the daemon's tracking.
+                  max:
+                    type: integer
+                    description: >
+                      The absolute lifetime maximum recorded by the drive
+                      firmware itself. This is a hardware-persisted
+                      record of the 'raw' value that spans the entire life
+                      of the disk, independent of the daemon's tracking.
+                  avg:
+                    type: integer
+                    description: >
+                      The lifetime average recorded by the drive
+                      firmware itself. This is a hardware-persisted
+                      record of the 'raw' value that spans the entire life
+                      of the disk, independent of the daemon's tracking.
+                  measure:
+                    type: string
+                    enum: [size, time, temperature, count, use_ratio, life_ratio, vendor]
+                    description: >
+                      The category of measurement for the 'raw' value:
+                      'size': Size-based metric in bytes (e.g., Total_LBAs_Written).
+                      'time': Duration measured in seconds (e.g., Power_On_Hours).
+                      'temperature': Thermal value in degrees Celsius.
+                      'count': A discrete event counter where an increase
+                      signifies worsening conditions (e.g., Reallocated_Sector_Ct).
+                      'use_ratio': A percentage increasing from 0 to 100,
+                      typically used for resource utilization or wear accumulation.
+                      'life_ratio': A percentage decreasing from 100 to 0,
+                      representing remaining health or estimated life.
+                      'vendor': An opaque raw value that does not map
+                      to a standard unit and should be treated as informational.
+                  unit:
+                    type: number
+                    format: float
+                    description: >
+                      The multiplier to convert the 'raw' value into the
+                      base SI unit for the specified 'measure'.
+                      Note that for 'time' the unit may be less than 1
+                      to represent milliseconds.
+                      For 'bytes', results in total bytes.
+                      For 'time', results in total seconds.
+                      For 'temperature', results in Celsius degrees.
+                      For 'count', it is a scale factor (usually 1).
+                      For 'percentage', it is a scale factor (usually 1).
+                  norm:
+                    type: integer
+                    description: >
+                      The current normalized value of the attribute, typically
+                      scaled from 100 to 1 (where lower is usually worse).
+                  worst:
+                    type: integer
+                    description: >
+                      The lowest normalized value ever recorded for this
+                      attribute during the drive's lifetime.
+                  thresh:
+                    type: integer
+                    description: >
+                      The manufacturer-defined limit. If 'norm' drops below
+                      this value, the attribute is considered failed.
+            power_on_hours:
+              type: integer
+              description: >
+                The total number of hours the drive has been powered on.
+                This field acts as a unified entry point, abstracting the data
+                from various possible S.M.A.R.T. attributes (such as IDs 9)
+                Used as a primary metric for determining the age and remaining
+                service life of the physical disk.
+            temperature_celsius:
+              type: integer
+              description: >
+                The current internal temperature of the drive in degrees Celsius.
+                This field acts as a unified entry point, abstracting the data
+                from various possible S.M.A.R.T. attributes (such as IDs 190 or 194)
+                depending on the manufacturer's implementation. Centralizing this
+                value ensures consistent monitoring regardless of the drive model.
+                Maintaining consistent temperatures below 45°C is critical for
+                the long-term reliability of the drive platters and motor.
+            temperature_min_celsius:
+              type: integer
+              description: >
+                The lowest recorded internal temperature of the drive in
+                degrees Celsius during the current power-on session or
+                drive lifetime.
+            temperature_max_celsius:
+              type: integer
+              description: >
+                The highest recorded internal temperature of the drive in
+                degrees Celsius. Exceeding manufacturer limits (often 55-60°C)
+                typically triggers a PREFAIL status.
+            failing:
+              type: boolean
+              description: >
+                The drive firmware explicitly reports that the disk is
+                currently failing the health status check.
+            prefail:
+              type: boolean
+              description: >
+                One or more critical 'Prefail' attributes are currently at or
+                below the manufacturer's threshold.
+            prefail_logged:
+              type: boolean
+              description: >
+                The status is 'OK', but attributes have dropped below the
+                threshold at some point in the device's history.
+            error_logged:
+              type: boolean
+              description: >
+                The internal device error log contains records of summary errors.
+            selftest_error_logged:
+              type: boolean
+              description: >
+                The self-test log contains records of failed or aborted tests.
+
+    Split:
+      type: object
+      required:
+        - path
+      properties:
+        path:
+          type: string
+          description: >
+            Path to the parity file for parity disks or filesystem mount point for data disks.
+        uuid:
+          type: string
+          description: >
+            The UUID of the filesystem.
+        stored_uuid:
+          type: string
+          description: >
+            Stored UUID of the filesystem in the content file.
+            This can be used to detect when the disk was replaced.
+        label:
+          type: string
+          description: >
+            The label of the filesystem.
+        type:
+          type: string
+          description: >
+            The type of the filesystem. Like ext4, ntfs.
+
+    Disk:
+      type: object
+      required: [name, health, power, splits, devices]
+      properties:
+        name:
+          type: string
+          description: >
+            Logical name (e.g., d1, d2, ..., parity, 2-parity, ...).
+        health:
+          type: string
+          enum: [passed, corrupt, prefail, failing, pending]
+          description: >
+            The aggregate operational health of the logical disk.
+
+            * passed: All member devices are nominal, and no data
+              inconsistencies are detected.
+            * corrupt: The disk has encountered silent data errors.
+            * prefail: A critical state indicating that one or more
+              underlying devices have encountered I/O failures, or a
+              SMART prefail condition.
+            * failing: A critical state indicating that one or more
+              underlying devices have encountered a SMART failing
+              condition.
+            * pending: The aggregate health has not yet been
+              determined.
+        power:
+          type: string
+          enum: [active, standby, pending]
+          description: >
+            The logical power state of the disk, mirrored from the underlying
+            physical device.
+
+            * 'active': The disk is spun up. Operations like 'sync' or 'scrub'
+              on this disk will start immediately.
+            * 'standby': The disk is spun down. Any array operation will
+              require a 10-15 second spin-up delay before data can be read.
+            * 'pending': The power state is currently unknown. The daemon
+              is waiting for the next probe or array command to verify if
+              the disk is spinning.
+        total_space_bytes:
+          type: integer
+          format: int64
+          description: >
+            The size in bytes of the filesystem. In case of parity splitted in
+            multiple filesystems, this is the cumulative size.
+        free_space_bytes:
+          type: integer
+          format: int64
+          description: >
+            The free space in bytes in the filesystem. In case of parity splitted
+            multiple filesystems, this is the cumulative size.
+        access_count:
+          type: integer
+          format: int64
+          example: 1250432
+          description: >
+            The total number of read and write operations processed by the
+            disk since the last system boot. This value is a cumulative
+            counter provided by the kernel.
+        access_count_initial_time:
+          type: string
+          example: '2026-01-12T08:00:00'
+          description: >
+            The timestamp when the daemon first sampled 'access_count'.
+            This timestamp is in local time.
+        access_count_idle_duration:
+          type: integer
+          format: int64
+          example: 3600
+          description: >
+            The number of seconds elapsed since the 'access_count' last
+            increased. This value measures continuous inactivity and is
+            used to determine if the disk is a candidate for spin-down
+            to save power.
+        error_io:
+          type: integer
+          format: int64
+          example: 0
+          description: >
+            The accumulated count of physical Input/Output errors encountered
+            since the daemon started. This tracks hardware-level failures
+            (disk, cable, or controller) recorded across all tasks executed
+            during the current session uptime.
+            This accumulated counter is cleared after a `scrub` command
+            reports that no blocks are bad.
+        error_data:
+          type: integer
+          format: int64
+          example: 0
+          description: >
+            The accumulated count of data integrity errors encountered since
+            the daemon started. This tracks 'silent' errors where a read
+            was physically successful, but the data failed checksum
+            verification, across all tasks in the current session.
+            This accumulated counter is cleared after a `scrub` command
+            reports that no blocks are bad.
+        splits:
+          type: array
+          items:
+            $ref: '#/components/schemas/Split'
+        devices:
+          type: array
+          items:
+            $ref: '#/components/schemas/Device'
+
+    Config:
+      type: object
+      description: Global configuration state for the SnapRAID Daemon.
+      properties:
+        config_full_access:
+          type: boolean
+          example: true
+          description: >
+            Indicates whether security-sensitive configuration parameters can be modified
+            dynamically.
+
+            If set to false, the following restricted options are forced into a
+            read-only state for all API requests:
+            - hook_run_as_user
+            - hook_script
+            - notify_run_as_user
+            - notify_heartbeat
+            - notify_result
+
+            Note that this flag itself is immutable via the API and can only be changed by
+            manually editing the 'snapraidd.conf' file and reloading the daemon.
+        maintenance_schedule:
+          type: string
+          example: '02:00'
+          description: >
+            Execution schedule for the automated 'sync' and 'scrub' sequence.
+            Accepted formats: "HH:MM" or "<day> HH:MM". If empty,
+            background maintenance is disabled.
+        sync_threshold_deletes:
+          type: integer
+          default: 0
+          example: 50
+          description: >
+            Threshold for deleted files. If the number of missing files exceeds
+            this value, the sync operation is suspended.
+
+            This threshold is strictly enforced during scheduled maintenance and
+            calls to 'maintenance'. It is BYPASSED for direct calls to 'sync',
+            allowing the user to force a sync via the API.
+            Set to 0 for no threshold.
+        sync_threshold_updates:
+          type: integer
+          default: 0
+          example: 500
+          description: >
+            Threshold for updated files. If the number of files with changed
+            sizes or timestamps exceeds this value, the sync operation is
+            suspended.
+
+            This threshold is strictly enforced during scheduled maintenance and
+            calls to 'maintenance'. It is BYPASSED for direct calls to 'sync',
+            allowing the user to force a sync via the API.
+            Set to 0 for no threshold.
+        sync_prehash:
+          type: boolean
+          example: true
+          description: >
+            Calculates hashes for new or modified files before updating
+            parity. Protects against integrating data corrupted by
+            faulty RAM or cables.
+        sync_prevent_truncations:
+          type: boolean
+          example: false
+          description: >
+            Stops the synchronization if files that previously
+            contained data are now empty. This acts as a safety
+            barrier to prevent parity updates when data may have
+            been accidentally cleared.
+        scrub_percentage:
+          type: number
+          format: float
+          minimum: 0.0
+          maximum: 100.0
+          example: 12.5
+          description: >
+            The percentage of the array verified during the scrub phase of
+            scheduled maintenance. Set to 0 to skip the scrub phase.
+
+            This setting is enforced during scheduled maintenance and calls
+            to 'maintenance'. It is BYPASSED for direct calls to 'scrub'.
+        scrub_older_than:
+          type: integer
+          minimum: 0
+          maximum: 1000
+          example: 10
+          description: >
+            Restricts scrubbing to data blocks not verified within the last
+            N days. Set to 0 to ignore block age.
+
+            This setting is enforced during scheduled maintenance and calls
+            to 'maintenance'. It is BYPASSED for direct calls to 'scrub'.
+        touch_zero_subseconds:
+          type: integer
+          enum: [0, 1]
+          default: 0
+          description: >
+            Enables a specific timestamp alignment pass as part of the
+            automated maintenance sequence.
+            The scope of this setting is to correct file metadata on
+            filesystems that lack sub-second precision (zeroed
+            nanoseconds). By refreshing these attributes to a random
+            sub-second value, the engine can reliably distinguish
+            between files that were moved or renamed versus those
+            that are new.
+            This is executed via the 'touch' command immediately before
+            the sync phase of the maintenance window to ensure high-
+            resolution tracking and prevent unnecessary parity
+            re-computation.
+        probe_interval_minutes:
+          type: integer
+          example: 15
+          description: >
+            Interval for background health monitoring. The daemon probes
+            disk power state. SMART attributes are only queried if the
+            disk is already in an active/idle state to prevent spin-up.
+            Set to 0 to disable monitoring.
+        spindown_idle_minutes:
+          type: integer
+          example: 30
+          description: >
+            Inactivity threshold for disk spindown. Activity defined as
+            physical read/write I/O. Power-state probes do not reset
+            this timer but allow more frequent I/O detection.
+            Set to 0 to disable.
+        hook_run_as_user:
+          type: string
+          example: 'nobody'
+          description: >
+            The system user account utilized for the execution of 'hook_script'.
+
+            If this parameter is null or empty, the scripts inherit the
+            process privileges of the running daemon.
+
+            For security enforcement, this parameter is immutable via
+            the REST API unless 'net_config_full_access' is explicitly
+            enabled in the static configuration file.
+        hook_script:
+          type: string
+          example: '/usr/local/bin/snapraid-hook.sh'
+          description: >
+            Absolute path to a custom script to trigger custom logic for
+            various daemon events.
+
+            For security enforcement, this parameter is immutable via
+            the REST API unless 'net_config_full_access' is explicitly
+            enabled in the static configuration file.
+        notify_syslog_enabled:
+          type: boolean
+          example: true
+          description: >
+            Enables logging to syslog/journald. Lifecycle events (start,
+            stop, reload) are logged regardless of severity level if this
+            is true.
+        notify_syslog_level:
+          type: string
+          enum: [critical, error, warning, info]
+          description: >
+            Minimum severity filter for task-related syslog entries.
+            Defaults to 'error' if unset.
+        notify_run_as_user:
+          type: string
+          example: 'nobody'
+          description: >
+            Specifies the system user account under which notification
+            subprocesses are executed.
+
+            This setting governs the execution privileges for heartbeat
+            pings, result shell commands (notify_result).
+
+            If left blank or omitted, these subprocesses inherit the
+            current privileges of the snapraidd daemon.
+
+            For security enforcement, this parameter is immutable via
+            the REST API unless 'net_config_full_access' is explicitly
+            enabled in the static configuration file.
+        notify_heartbeat:
+          type: string
+          example: 'curl -fsS --max-time 30 --retry 3 https://hc-ping.com/...'
+          description: >
+            Shell command executed only upon task success (exit code 0).
+            Used for external 'dead man's switch' telemetry.
+            Disabled if empty.
+
+            For security enforcement, this parameter is immutable via
+            the REST API unless 'net_config_full_access' is explicitly
+            enabled in the static configuration file.
+        notify_result:
+          type: string
+          example: 'mail -s "%s" your_user@localhost'
+          description: >
+            Shell command executed after task completion. The daemon pipes
+            the task report (plain-text) into the command's stdin.
+            Use the %s placeholder for dynamic injection of the subject string.
+
+            For security enforcement, this parameter is immutable via
+            the REST API unless 'net_config_full_access' is explicitly
+            enabled in the static configuration file.
+        notify_result_level:
+          type: string
+          enum: [critical, error, warning, info]
+          description: >
+            Minimum severity threshold required to trigger the 'notify_result'
+            command. Defaults to 'error' if unset.
+        notify_differences:
+          type: boolean
+          example: true
+          description: >
+            Includes a detailed list of added/removed/modified files in
+            the 'notify_result' report bodies.
+
+    Diff:
+      type: object
+      required:
+        - change
+        - disk
+        - path
+      description: >
+        Represents an individual file change detected during a diff operation.
+      properties:
+        change:
+          type: string
+          enum: [added, removed, updated, moved, copied, relocated, restored]
+          description: >
+            The specific type of change detected:
+            - added: New file not in content file.
+            - removed: File missing from filesystem.
+            - updated: Size, timestamp, or link target changed.
+            - moved: Path changed on the same disk.
+            - copied: New file is a copy from another disk.
+            - relocated: New file is moved from another disk.
+            - restored: Inode changed but metadata matches. Likely a backup restore.
+          example: 'moved'
+        disk:
+          type: string
+          description: >
+            The name of the disk where the file currently resides.
+          example: 'd1'
+        path:
+          type: string
+          description: >
+            The current relative path of the file on the disk.
+          example: 'movies/file.mkv'
+        source_disk:
+          type: string
+          description: >
+            The name of the originating disk. This field is only populated if
+            the reason is 'moved', 'copied' or 'relocated'.
+          example: 'd2'
+        source_path:
+          type: string
+          description: >
+            The original path of the file. This field is only populated if the
+            reason is 'moved', 'copied' or 'relocated'.
+          example: 'downloads/file.mkv'
+
+    Fix:
+      type: object
+      required:
+        - result
+        - disk
+        - path
+      description: >
+        Represents an individual file recovery operation during a fix operation.
+      properties:
+        result:
+          type: string
+          enum: [recovered, unrecoverable]
+          description: >
+            The specific type of change detected:
+            - recovered: The file was recovered.
+            - unrecoverable: File is unrecoverable.
+        disk:
+          type: string
+          description: >
+            The name of the disk where the file currently resides.
+          example: 'd1'
+        path:
+          type: string
+          description: >
+            The current relative path of the file on the disk.
+          example: 'movies/file.mkv'
+
+    System:
+      type: object
+      description: >
+        Metadata describing the host hardware and operating system
+        environment where the daemon is executing.
+      properties:
+        hostname:
+          type: string
+          description: >
+            The network name of the host machine.
+        os_distribution:
+          type: string
+          description: >
+            The name and version of the operating system
+            (e.g., "Ubuntu 24.04 LTS").
+        os_kernel_version:
+          type: string
+          description: >
+            The version of the running OS kernel.
+        uptime_seconds:
+          type: integer
+          format: int64
+          description: >
+            The number of seconds the system has been running.
+        cpu_model:
+          type: string
+          description: >
+            The model name of the system processor, relevant for
+            parity calculation performance.
+        memory_total_bytes:
+          type: integer
+          format: int64
+          description: >
+            Total physical RAM available on the host.
+        memory_free_bytes:
+          type: integer
+          format: int64
+          description: >
+            Currently available physical RAM.
+        is_ecc:
+          type: boolean
+          description: >
+            Indicates if the system memory supports Error Correction
+            Code (ECC), if detectable.
+        motherboard:
+          type: string
+          description: >
+            Manufacturer and model of the system motherboard.
+
+    ScrubHistory:
+      type: object
+      description: |
+        The root object containing the time-series
+        data and the axis limits for the scrub report.
+      required:
+        - x_axis_low
+        - x_axis_high
+        - x_axis_median
+        - y_axis_low
+        - y_axis_high
+        - points
+      properties:
+        x_axis_low:
+          type: integer
+          description: |
+            The lower boundary of the X-axis,
+            representing the oldest record in the set.
+        x_axis_high:
+          type: integer
+          description: |
+            The upper boundary of the X-axis,
+            representing the most recent time.
+        x_axis_median:
+          type: integer
+          description: |
+            The median boundary of the X-axis.
+        y_axis_low:
+          type: number
+          description: |
+            The minimum value of the Y-axis,
+            used to set the chart's vertical floor.
+        y_axis_high:
+          type: number
+          description: |
+            The maximum value of the Y-axis,
+            providing a ceiling for the vertical scale.
+        points:
+          type: array
+          description: |
+            A sequence of data points capturing
+            scrubbing activity at specific intervals.
+          items:
+            type: object
+            description: |
+              An explicit data point entry mapping
+              metrics to a specific time in the past.
+            required:
+              - ago
+              - scrubbed
+              - new
+            properties:
+              ago:
+                type: integer
+                description: |
+                  The number of time units elapsed
+                  from the present moment to this record.
+              scrubbed:
+                type: number
+                description: |
+                  The quantity or volume of data
+                  that was scrubbed at this time point.
+              new:
+                type: number
+                description: |
+                  The quantity or volume of new data
+                  that was identified at this time point.
+
+    Array:
+      type: object
+      description: >
+        Comprehensive state of array configuration, health metrics, and execution metadata.
+      required:
+        - daemon_version
+        - daemon_conf
+        - health
+      properties:
+        daemon_version:
+          type: string
+          example: '13.1'
+          description: >
+            The version of the SnapRAID Daemon currently running.
+        daemon_conf:
+          type: string
+          example: '/etc/snapraid.conf'
+          description: >
+            Absolute path to the SnapRAID Daemon configuration file.
+        health:
+          type: string
+          enum: [passed, corrupt, prefail, failing, pending]
+          description: >
+            The aggregate health of the entire array.
+
+            * passed: All member devices are nominal, and no data
+              inconsistencies are detected.
+            * corrupt: This is triggered by the presence of silent
+              data errors, specifically if the 'blocks_bad' counter
+              is greater than zero.
+            * prefail: A critical state indicating that one or more
+              underlying devices have encountered I/O failures, or a
+              SMART prefail condition.
+            * failing: A critical state indicating that one or more
+              underlying devices have encountered a SMART failing
+              condition.
+            * pending: The aggregate health has not yet been
+              determined.
+        engine_version:
+          type: string
+          example: '13.1'
+          description: >
+            The version of the underlying SnapRAID CLI binary.
+        engine_conf:
+          type: string
+          example: '/etc/snapraid.conf'
+          description: >
+            Absolute path to the SnapRAID CLI configuration file.
+        engine_content:
+          type: string
+          example: '/var/snapraid/snapraid.content'
+          description: >
+            Absolute path to the primary SnapRAID CLI content file.
+        block_size_bytes:
+          type: integer
+          example: 262144
+          description: >
+            Array block size in bytes (always power of 2).
+        data_disks_count:
+          type: integer
+          description: >
+            The total number of data disks currently registered
+            and protected in the SnapRAID CLI configuration.
+        parity_disks_count:
+          type: integer
+          description: >
+            The number of parity disks (redundancy levels) configured,
+            defining how many simultaneous disk failures the array can survive.
+        extra_disks_count:
+          type: integer
+          description: >
+            The total number of extra disks currently registered in the
+            SnapRAID CLI configuration.
+        last_command_at:
+          type: string
+          example: '2026-01-12T08:00:00'
+          description: >
+            Local timestamp of the most recently concluded task.
+        last_command:
+          type: string
+          enum: [probe, up, down, smart, diff, sync, scrub, check, fix, report, down_idle]
+          description: >
+            Identifier of the last successfully completed command.
+        annual_failure_rate:
+          type: number
+          format: double
+          description: >
+            The arithmetic sum of the Annual Failure Rates (AFR) for all disks
+            in the array, representing the expected number of device
+            failures per year.
+        failure_probability:
+          type: number
+          format: double
+          description: >
+            Statistical probability of at least one disk failure within a
+            one-year period, calculated using a Poisson distribution model
+            based on the aggregate Annual Failure Rate.
+        total_space_bytes:
+          type: integer
+          format: int64
+          description: >
+            The size in bytes of all the data disks (not counting parity disks).
+        free_space_bytes:
+          type: integer
+          format: int64
+          description: >
+            The free space in bytes of all the data disks (not counting parity disks).
+        files_count:
+          type: integer
+          format: int64
+          description: >
+            The number of files currently tracked within the content file
+            across all data drives.
+        blocks_bad:
+          type: integer
+          format: int64
+          example: 0
+          description: >
+            The count of blocks flagged as corrupted. These blocks require a
+            'fix' operation to restore data integrity.
+        blocks_rehash:
+          type: integer
+          format: int64
+          example: 0
+          description: >
+            The count of blocks scheduled for a rehash. This occurs when
+            upgrading the hash algorithm.
+        blocks_unscrubbed:
+          type: integer
+          format: int64
+          example: 0
+          description: >
+            The count of blocks that have never been scrubbed.
+            Newly added files are reported as unscrubbed immediately
+            following a successful sync until a scrub task is performed.
+        blocks_unsynced:
+          type: integer
+          format: int64
+          example: 0
+          description: >
+            The count of blocks that currently require a parity sync.
+            These are typically present only after a sync task has
+            been interrupted or failed to complete.
+        blocks_count:
+          type: integer
+          format: int64
+          example: 0
+          description: >
+            The total number of data blocks tracked in the content file.
+            This value serves as the denominator for calculating the
+            percentage of the array that is unsynced, unscrubbed, or bad.
+        last_sync_at:
+          type: string
+          example: '2026-01-12T08:00:00'
+          description: >
+            Local timestamp of the last parity synchronization ('sync').
+        last_scrub_at:
+          type: string
+          example: '2026-01-12T08:00:00'
+          description: >
+            Local timestamp of the last data integrity verification ('scrub').
+        last_diff_at:
+          type: string
+          example: '2026-01-12T08:00:00'
+          description: >
+            Local timestamp of the last array change analysis ('diff').
+        last_fix_at:
+          type: string
+          example: '2026-01-12T08:00:00'
+          description: >
+            Local timestamp of the last array fix ('fix').
+        hold_off:
+          type: boolean
+          description: >
+            Indicates if the next scheduled maintenance is
+            currently flagged to be skipped. This value
+            returns to false automatically after the skip
+            event.
+        diff_equal:
+          type: integer
+          format: int64
+          description: >
+            The count of files whose metadata and data match the current parity.
+        diff_added:
+          type: integer
+          format: int64
+          description: >
+            The count of brand new files not present in the last sync.
+        diff_removed:
+          type: integer
+          format: int64
+          description: >
+            The count of files that existed in the last sync but are now missing.
+        diff_updated:
+          type: integer
+          format: int64
+          description: >
+            The count of existing files where the timestamp or size has changed.
+        diff_moved:
+          type: integer
+          format: int64
+          description: >
+            The count of files relocated to a new path or renamed but retaining the same inode.
+        diff_copied:
+          type: integer
+          format: int64
+          description: >
+            The count of new files created by copying an existing protected file to a new path.
+        diff_relocated:
+          type: integer
+          format: int64
+          description: >
+            The count of new files created by moving an existing protected file to a new path.
+        diff_restored:
+          type: integer
+          format: int64
+          description: >
+            The count of new files matching a parity entry by name/time/size but with a new inode (e.g., replaced from backup).
+        diffs:
+          type: array
+          description: >
+            A collection of all changes detected in the array state obtained from the latest diff operation.
+            These differences represent changes since the last sync.
+          items:
+            $ref: '#/components/schemas/Diff'
+        fix_recovered:
+          type: integer
+          format: int64
+          description: >
+            The count of files recovered in all the fix commands after the latest sync.
+        fix_unrecoverable:
+          type: integer
+          format: int64
+          description: >
+            The count of files unrecoverable in all the fix commands after the latest sync.
+        fixes:
+          type: array
+          description: >
+            A collection of all fixes done in the array.
+            These fixes represent repair operation done since the last sync.
+          items:
+            $ref: '#/components/schemas/Fix'
+        scrub_history:
+          $ref: '#/components/schemas/ScrubHistory'

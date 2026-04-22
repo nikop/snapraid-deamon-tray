@@ -1,0 +1,5 @@
+<Solution>
+  <Folder Name="/Solution Items/" />
+  <Project Path="SnapraidDaemonTray/SnapraidDaemonTray.csproj" />
+  <Project Path="SnapraidDeamonApi/SnapraidDeamonApi.csproj" Id="2baf6033-35b2-494e-9d1e-ecc670286b65" />
+</Solution>

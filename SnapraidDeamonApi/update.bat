@@ -1,0 +1,2 @@
+curl "https://raw.githubusercontent.com/amadvance/snapraid-daemon/refs/heads/master/snapraidd.yaml" -o "snapraidd.yaml"
+kiota generate -l CSharp -c SnapraidDaemonClient -n SnapraidDeamonApi -d ./snapraidd.yaml -o .

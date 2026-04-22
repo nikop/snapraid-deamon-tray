@@ -1,0 +1,19 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <OpenApiReference Include="OpenAPIs\snapraidd.yaml">
+      <SourceUri>https://raw.githubusercontent.com/amadvance/snapraid-daemon/refs/heads/master/snapraidd.yaml</SourceUri>
+      <NSwagJsonLibrary>SystemTextJson</NSwagJsonLibrary>
+    </OpenApiReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Kiota.Bundle" Version="1.22.1" />
+  </ItemGroup>
+
+</Project>

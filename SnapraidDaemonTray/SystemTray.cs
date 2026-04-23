@@ -3,6 +3,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
+using SnapraidDaemonTray.Forms;
 using SnapraidDaemonTray.Instances;
 using SnapraidDaemonTray.Models;
 using SnapraidDaemonTray.Properties;
@@ -66,6 +67,40 @@ public class SystemTray(IHostApplicationLifetime lifetime, IServiceProvider serv
         });
     }
 
+    public async Task OpenSettings()
+    {
+        // Open config editor in a new scope
+        if (_trayScope is not null)
+        {
+            return;
+        }
+
+        var scope = serviceProvider.CreateScope();
+
+        await winFormsContext.Dispatcher.InvokeAsync(() =>
+        {
+            try
+            {
+                var editor = scope.ServiceProvider.GetRequiredService<ConfigEditor>();
+                editor.Show();
+                editor.FormClosed += (s, ev) =>
+                {
+                    Task.Run(async () =>
+                    {
+                        await Task.Delay(500);
+                        scope.Dispose();
+                        scope = null;
+                    });
+                };
+            }
+            catch
+            {
+                scope?.Dispose();
+                scope = null;
+            }
+        });
+    }
+
     public async Task StartMaintenance()
     {
         using var scope = serviceProvider.CreateScope();
@@ -91,38 +126,9 @@ public class SystemTray(IHostApplicationLifetime lifetime, IServiceProvider serv
             await StartMaintenance();
         });
 
-        contextMenuStrip.Items.Add("Edit Configuration", null, (sender, e) =>
+        contextMenuStrip.Items.Add("Edit Configuration", null, async (sender, e) =>
         {
-            // Open config editor in a new scope
-            if (_trayScope is not null)
-            {
-                return;
-            }
-
-            _trayScope = serviceProvider.CreateScope();
-
-            winFormsContext.Dispatcher.InvokeAsync(() =>
-            {
-                try
-                {
-                    var editor = _trayScope.ServiceProvider.GetRequiredService<Forms.ConfigEditor>();
-                    editor.Show();
-                    editor.FormClosed += (s, ev) =>
-                    {
-                        Task.Run(async () =>
-                        {
-                            await Task.Delay(500);
-                            _trayScope.Dispose();
-                            _trayScope = null;
-                        });
-                    };
-                }
-                catch
-                {
-                    _trayScope.Dispose();
-                    _trayScope = null;
-                }
-            });
+            await OpenSettings();
         });
 
         contextMenuStrip.Items.Add("Exit", null, (sender, e) =>

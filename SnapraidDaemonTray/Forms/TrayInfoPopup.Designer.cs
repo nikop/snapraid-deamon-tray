@@ -1,4 +1,4 @@
-﻿namespace SnapraidDaemonTray;
+﻿namespace SnapraidDaemonTray.Forms;
 
 partial class TrayInfoPopup
 {

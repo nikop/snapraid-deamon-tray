@@ -1,9 +1,8 @@
 using Dapplo.Microsoft.Extensions.Hosting.WinForms;
 
-using SnapraidDaemonTray.Forms;
 using SnapraidDaemonTray.Instances;
 
-namespace SnapraidDaemonTray;
+namespace SnapraidDaemonTray.Forms;
 
 public partial class TrayInfoPopup : Form, IWinFormsShell
 {

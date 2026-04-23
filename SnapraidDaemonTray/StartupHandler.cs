@@ -14,7 +14,8 @@ internal partial class StartupHandler(InstanceManager instanceManager, SystemTra
 
         if (instances.Count == 0)
         {
-            // TODO: Show Setup
+            MessageBox.Show("No Instances Configured!");
+            await systemTray.OpenSettings();
         }
 
         var isLaunchedByNotification = Environment.GetCommandLineArgs().Contains(NotificationsHandler.NotificationLaunchArgument);

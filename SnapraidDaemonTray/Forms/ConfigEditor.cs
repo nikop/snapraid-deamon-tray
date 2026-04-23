@@ -132,7 +132,12 @@ public partial class ConfigEditor : Form
 
     private async void buttonSave_Click(object sender, EventArgs e)
     {
-        await TrySaveAsync();
+        var result = await TrySaveAsync();
+
+        if (result)
+        {
+            Close();
+        }
     }
 
     private async Task<bool> TrySaveAsync()
@@ -164,7 +169,7 @@ public partial class ConfigEditor : Form
         {
             await _appConfiguration.SaveConfig(config);
             _isDirty = false;
-            MessageBox.Show("Configuration saved.", "Save", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            //MessageBox.Show("Configuration saved.", "Save", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return true;
         }
         catch (Exception ex)

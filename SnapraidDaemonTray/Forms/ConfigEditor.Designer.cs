@@ -31,13 +31,13 @@ partial class ConfigEditor
         tabControlMain = new TabControl();
         tabPageServers = new TabPage();
         dataGridViewServers = new DataGridView();
-        colEnabled = new DataGridViewCheckBoxColumn();
-        colName = new DataGridViewTextBoxColumn();
-        colAddress = new DataGridViewTextBoxColumn();
         buttonAdd = new Button();
         buttonRemove = new Button();
         buttonSave = new Button();
         buttonCancel = new Button();
+        colEnabled = new DataGridViewCheckBoxColumn();
+        colName = new DataGridViewTextBoxColumn();
+        colAddress = new DataGridViewTextBoxColumn();
         tabControlMain.SuspendLayout();
         tabPageServers.SuspendLayout();
         ((System.ComponentModel.ISupportInitialize)dataGridViewServers).BeginInit();
@@ -55,6 +55,7 @@ partial class ConfigEditor
         // 
         // tabPageServers
         // 
+        tabPageServers.BackColor = SystemColors.Control;
         tabPageServers.Controls.Add(dataGridViewServers);
         tabPageServers.Controls.Add(buttonAdd);
         tabPageServers.Controls.Add(buttonRemove);
@@ -64,37 +65,19 @@ partial class ConfigEditor
         tabPageServers.Size = new Size(595, 263);
         tabPageServers.TabIndex = 0;
         tabPageServers.Text = "Servers";
-        tabPageServers.UseVisualStyleBackColor = true;
         // 
         // dataGridViewServers
         // 
         dataGridViewServers.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
+        dataGridViewServers.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
         dataGridViewServers.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize;
         dataGridViewServers.Columns.AddRange(new DataGridViewColumn[] { colEnabled, colName, colAddress });
         dataGridViewServers.Location = new Point(6, 6);
         dataGridViewServers.Name = "dataGridViewServers";
+        dataGridViewServers.RowHeadersVisible = false;
+        dataGridViewServers.SelectionMode = DataGridViewSelectionMode.CellSelect;
         dataGridViewServers.Size = new Size(583, 191);
         dataGridViewServers.TabIndex = 0;
-        // 
-        // colEnabled
-        // 
-        colEnabled.DataPropertyName = "Enabled";
-        colEnabled.HeaderText = "Enabled";
-        colEnabled.Name = "colEnabled";
-        // 
-        // colName
-        // 
-        colName.DataPropertyName = "Name";
-        colName.HeaderText = "Name";
-        colName.Name = "colName";
-        colName.Width = 150;
-        // 
-        // colAddress
-        // 
-        colAddress.DataPropertyName = "Address";
-        colAddress.HeaderText = "Address";
-        colAddress.Name = "colAddress";
-        colAddress.Width = 300;
         // 
         // buttonAdd
         // 
@@ -140,6 +123,29 @@ partial class ConfigEditor
         buttonCancel.UseVisualStyleBackColor = true;
         buttonCancel.Click += buttonCancel_Click;
         // 
+        // colEnabled
+        // 
+        colEnabled.DataPropertyName = "Enabled";
+        colEnabled.FillWeight = 29.9845352F;
+        colEnabled.HeaderText = "Enabled";
+        colEnabled.MinimumWidth = 25;
+        colEnabled.Name = "colEnabled";
+        colEnabled.Resizable = DataGridViewTriState.False;
+        // 
+        // colName
+        // 
+        colName.DataPropertyName = "Name";
+        colName.FillWeight = 83.456955F;
+        colName.HeaderText = "Name";
+        colName.Name = "colName";
+        // 
+        // colAddress
+        // 
+        colAddress.DataPropertyName = "Address";
+        colAddress.FillWeight = 83.456955F;
+        colAddress.HeaderText = "Address";
+        colAddress.Name = "colAddress";
+        // 
         // ConfigEditor
         // 
         AcceptButton = buttonSave;
@@ -170,7 +176,7 @@ partial class ConfigEditor
     private System.Windows.Forms.Button buttonRemove;
     private System.Windows.Forms.Button buttonSave;
     private System.Windows.Forms.Button buttonCancel;
-    private System.Windows.Forms.DataGridViewCheckBoxColumn colEnabled;
-    private System.Windows.Forms.DataGridViewTextBoxColumn colName;
-    private System.Windows.Forms.DataGridViewTextBoxColumn colAddress;
+    private DataGridViewCheckBoxColumn colEnabled;
+    private DataGridViewTextBoxColumn colName;
+    private DataGridViewTextBoxColumn colAddress;
 }

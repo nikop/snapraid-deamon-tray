@@ -31,15 +31,16 @@ partial class ConfigEditor
         tabControlMain = new TabControl();
         tabPageServers = new TabPage();
         dataGridViewServers = new DataGridView();
-        buttonAdd = new Button();
-        buttonRemove = new Button();
-        buttonSave = new Button();
         colEnabled = new DataGridViewCheckBoxColumn();
         colName = new DataGridViewTextBoxColumn();
         colAddress = new DataGridViewTextBoxColumn();
-        ((System.ComponentModel.ISupportInitialize)dataGridViewServers).BeginInit();
+        buttonAdd = new Button();
+        buttonRemove = new Button();
+        buttonSave = new Button();
+        buttonCancel = new Button();
         tabControlMain.SuspendLayout();
         tabPageServers.SuspendLayout();
+        ((System.ComponentModel.ISupportInitialize)dataGridViewServers).BeginInit();
         SuspendLayout();
         // 
         // tabControlMain
@@ -49,7 +50,7 @@ partial class ConfigEditor
         tabControlMain.Location = new Point(12, 12);
         tabControlMain.Name = "tabControlMain";
         tabControlMain.SelectedIndex = 0;
-        tabControlMain.Size = new Size(560, 340);
+        tabControlMain.Size = new Size(603, 291);
         tabControlMain.TabIndex = 0;
         // 
         // tabPageServers
@@ -60,7 +61,7 @@ partial class ConfigEditor
         tabPageServers.Location = new Point(4, 24);
         tabPageServers.Name = "tabPageServers";
         tabPageServers.Padding = new Padding(3);
-        tabPageServers.Size = new Size(552, 312);
+        tabPageServers.Size = new Size(595, 263);
         tabPageServers.TabIndex = 0;
         tabPageServers.Text = "Servers";
         tabPageServers.UseVisualStyleBackColor = true;
@@ -72,42 +73,8 @@ partial class ConfigEditor
         dataGridViewServers.Columns.AddRange(new DataGridViewColumn[] { colEnabled, colName, colAddress });
         dataGridViewServers.Location = new Point(6, 6);
         dataGridViewServers.Name = "dataGridViewServers";
-        dataGridViewServers.RowTemplate.Height = 25;
-        dataGridViewServers.Size = new Size(540, 240);
+        dataGridViewServers.Size = new Size(583, 191);
         dataGridViewServers.TabIndex = 0;
-        // 
-        // buttonAdd
-        // 
-        buttonAdd.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
-        buttonAdd.Location = new Point(6, 252);
-        buttonAdd.Name = "buttonAdd";
-        buttonAdd.Size = new Size(75, 23);
-        buttonAdd.TabIndex = 1;
-        buttonAdd.Text = "Add";
-        buttonAdd.UseVisualStyleBackColor = true;
-        buttonAdd.Click += buttonAdd_Click;
-        // 
-        // buttonRemove
-        // 
-        buttonRemove.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
-        buttonRemove.Location = new Point(87, 252);
-        buttonRemove.Name = "buttonRemove";
-        buttonRemove.Size = new Size(75, 23);
-        buttonRemove.TabIndex = 2;
-        buttonRemove.Text = "Remove";
-        buttonRemove.UseVisualStyleBackColor = true;
-        buttonRemove.Click += buttonRemove_Click;
-        // 
-        // buttonSave
-        // 
-        buttonSave.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
-        buttonSave.Location = new Point(471, 252);
-        buttonSave.Name = "buttonSave";
-        buttonSave.Size = new Size(75, 23);
-        buttonSave.TabIndex = 3;
-        buttonSave.Text = "Save";
-        buttonSave.UseVisualStyleBackColor = true;
-        buttonSave.Click += buttonSave_Click;
         // 
         // colEnabled
         // 
@@ -129,10 +96,32 @@ partial class ConfigEditor
         colAddress.Name = "colAddress";
         colAddress.Width = 300;
         // 
-        // buttonSave (moved to form)
+        // buttonAdd
+        // 
+        buttonAdd.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
+        buttonAdd.Location = new Point(6, 203);
+        buttonAdd.Name = "buttonAdd";
+        buttonAdd.Size = new Size(75, 23);
+        buttonAdd.TabIndex = 1;
+        buttonAdd.Text = "Add";
+        buttonAdd.UseVisualStyleBackColor = true;
+        buttonAdd.Click += buttonAdd_Click;
+        // 
+        // buttonRemove
+        // 
+        buttonRemove.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
+        buttonRemove.Location = new Point(87, 203);
+        buttonRemove.Name = "buttonRemove";
+        buttonRemove.Size = new Size(75, 23);
+        buttonRemove.TabIndex = 2;
+        buttonRemove.Text = "Remove";
+        buttonRemove.UseVisualStyleBackColor = true;
+        buttonRemove.Click += buttonRemove_Click;
+        // 
+        // buttonSave
         // 
         buttonSave.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
-        buttonSave.Location = new Point(497, 320);
+        buttonSave.Location = new Point(540, 309);
         buttonSave.Name = "buttonSave";
         buttonSave.Size = new Size(75, 23);
         buttonSave.TabIndex = 3;
@@ -142,9 +131,8 @@ partial class ConfigEditor
         // 
         // buttonCancel
         // 
-        buttonCancel = new Button();
         buttonCancel.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
-        buttonCancel.Location = new Point(416, 320);
+        buttonCancel.Location = new Point(459, 309);
         buttonCancel.Name = "buttonCancel";
         buttonCancel.Size = new Size(75, 23);
         buttonCancel.TabIndex = 4;
@@ -154,20 +142,20 @@ partial class ConfigEditor
         // 
         // ConfigEditor
         // 
+        AcceptButton = buttonSave;
         AutoScaleDimensions = new SizeF(7F, 15F);
         AutoScaleMode = AutoScaleMode.Font;
-        ClientSize = new Size(584, 365);
+        CancelButton = buttonCancel;
+        ClientSize = new Size(627, 344);
         Controls.Add(buttonCancel);
         Controls.Add(buttonSave);
         Controls.Add(tabControlMain);
-        AcceptButton = buttonSave;
-        CancelButton = buttonCancel;
         KeyPreview = true;
         Name = "ConfigEditor";
         Text = "Configuration Editor";
         Load += ConfigEditor_Load;
-        tabPageServers.ResumeLayout(false);
         tabControlMain.ResumeLayout(false);
+        tabPageServers.ResumeLayout(false);
         ((System.ComponentModel.ISupportInitialize)dataGridViewServers).EndInit();
         ResumeLayout(false);
 

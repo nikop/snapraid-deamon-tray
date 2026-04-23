@@ -19,6 +19,15 @@ public class AppConfiguration
 
     private readonly SemaphoreSlim _lock = new(1, 1);
 
+    public event EventHandler<ConfigChangedEventArgs>? ConfigurationChanged;
+
+    public sealed class ConfigChangedEventArgs : EventArgs
+    {
+        public ConfigFile Config { get; }
+
+        public ConfigChangedEventArgs(ConfigFile config) => Config = config;
+    }
+
     public AppConfiguration()
     {
         var configPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "SnapraidDeamonTray");
@@ -46,15 +55,7 @@ public class AppConfiguration
 
         appConfig = new ConfigFile
         {
-            Servers = new System.Collections.Generic.List<ConfigFileServer>
-            {
-                new ConfigFileServer
-                {
-                    Enabled = true,
-                    Name = "Default",
-                    Address = "http://127.0.0.1:7627/",
-                }
-            }
+            Servers = [],
         };
 
         var json = JsonSerializer.Serialize(appConfig, jsonSerializerOptions);
@@ -68,11 +69,22 @@ public class AppConfiguration
     {
         await _lock.WaitAsync();
 
-        ActiveConfig ??= await ReadConfig();
+        var shouldRaise = false;
+
+        if (ActiveConfig is null)
+        {
+            ActiveConfig = await ReadConfig();
+            shouldRaise = true;
+        }
+
+        var config = ActiveConfig!;
 
         _lock.Release();
 
-        return ActiveConfig;
+        if (shouldRaise)
+            OnConfigurationChanged(config);
+
+        return config;
     }
 
     public async Task SaveConfig(ConfigFile config)
@@ -86,5 +98,19 @@ public class AppConfiguration
         ActiveConfig = config;
 
         _lock.Release();
+
+        OnConfigurationChanged(config);
+    }
+
+    protected virtual void OnConfigurationChanged(ConfigFile config)
+    {
+        try
+        {
+            ConfigurationChanged?.Invoke(this, new ConfigChangedEventArgs(config));
+        }
+        catch
+        {
+            // Swallow exceptions from handlers to avoid crashing caller
+        }
     }
 }

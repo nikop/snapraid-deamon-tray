@@ -1,12 +1,25 @@
 ﻿using SnapraidDaemonTray.Events;
 
 using System.Collections.Concurrent;
+using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace SnapraidDaemonTray.Instances;
 
-public class InstanceManager(AppConfiguration appConfiguration, NotificationsHandler notificationsHandler)
+public class InstanceManager
 {
+    private readonly AppConfiguration appConfiguration;
+    private readonly NotificationsHandler notificationsHandler;
+
+    public InstanceManager(AppConfiguration appConfiguration, NotificationsHandler notificationsHandler)
+    {
+        this.appConfiguration = appConfiguration;
+        this.notificationsHandler = notificationsHandler;
+
+        this.appConfiguration.ConfigurationChanged += AppConfiguration_ConfigurationChanged;
+    }
+
     private readonly ConcurrentDictionary<string, Instance> _instances = [];
 
     private readonly SemaphoreSlim _lock = new(1, 1);
@@ -30,33 +43,73 @@ public class InstanceManager(AppConfiguration appConfiguration, NotificationsHan
     private async Task UpdateInstancesInternal()
     {
         await _lock.WaitAsync();
-
-        var conf = await appConfiguration.GetCurrentConfiguration();
-
-        foreach (var item in conf.Servers)
+        try
         {
-            var key = MakeFileNameSafe(item.Name);
+            var conf = await appConfiguration.GetCurrentConfiguration();
 
-            if (!item.Enabled)
+            // Build set of desired instance keys from enabled servers in config
+            var desiredKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var item in conf.Servers)
             {
-                continue;
+                if (!item.Enabled)
+                    continue;
+
+                var key = MakeFileNameSafe(item.Name);
+                desiredKeys.Add(key);
+
+                if (!_instances.TryGetValue(key, out var instance))
+                {
+                    instance = new Instance(item) { Key = key };
+                    // Try to add; another thread might have added concurrently
+                    if (!_instances.TryAdd(key, instance))
+                        continue;
+
+                    instance.MaintenanceStarted += Instance_MaintenanceStarted;
+                    instance.MaintenanceProgress += Instance_MaintenanceProgress;
+                    instance.MaintenanceCompleted += Instance_MaintenanceCompleted;
+                    instance.MaintenanceCompletedError += Instance_MaintenanceError;
+                }
+
+                await instance.Update();
             }
 
-            if (!_instances.TryGetValue(key, out var instance))
+            // Remove instances that are not present/enabled in the new configuration
+            foreach (var existingKey in _instances.Keys.ToList())
             {
-                instance = new Instance(item) { Key = key };
-                _instances[key] = instance;
-
-                instance.MaintenanceStarted += Instance_MaintenanceStarted;
-                instance.MaintenanceProgress += Instance_MaintenanceProgress;
-                instance.MaintenanceCompleted += Instance_MaintenanceCompleted;
-                instance.MaintenanceCompletedError += Instance_MaintenanceError;
+                if (!desiredKeys.Contains(existingKey))
+                {
+                    if (_instances.TryRemove(existingKey, out var removed))
+                    {
+                        // Unsubscribe events to avoid potential memory leaks
+                        removed.MaintenanceStarted -= Instance_MaintenanceStarted;
+                        removed.MaintenanceProgress -= Instance_MaintenanceProgress;
+                        removed.MaintenanceCompleted -= Instance_MaintenanceCompleted;
+                        removed.MaintenanceCompletedError -= Instance_MaintenanceError;
+                    }
+                }
             }
-
-            await instance.Update();
         }
+        finally
+        {
+            _lock.Release();
+        }
+    }
 
-        _lock.Release();
+    private void AppConfiguration_ConfigurationChanged(object? sender, AppConfiguration.ConfigChangedEventArgs e)
+    {
+        // Run update in background; swallow exceptions to avoid crashing event thread
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await UpdateInstancesInternal();
+            }
+            catch
+            {
+                // ignore
+            }
+        });
     }
 
     private void Instance_MaintenanceStarted(object? sender, MaintenanceStartedEventArgs e)

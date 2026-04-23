@@ -1,10 +1,6 @@
-using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Linq;
-using System.Windows.Forms;
-using System.Drawing;
 using SnapraidDaemonTray.Config;
+
+using System.ComponentModel;
 
 namespace SnapraidDaemonTray.Forms;
 
@@ -12,7 +8,7 @@ public partial class ConfigEditor : Form
 {
     private readonly AppConfiguration _appConfiguration;
 
-    private BindingList<ConfigFileServer> _serversBinding;
+    private BindingList<ConfigFileServer> _serversBinding = [];
     private bool _isDirty = false;
 
     public ConfigEditor(AppConfiguration appConfiguration)
@@ -26,7 +22,7 @@ public partial class ConfigEditor : Form
     {
         var dgv = (DataGridView)sender!;
         var cell = dgv.Rows[e.RowIndex].Cells[e.ColumnIndex];
-        var value = (e.FormattedValue ?? string.Empty).ToString();
+        var value = (e.FormattedValue ?? string.Empty).ToString() ?? "";
 
         var error = GetCellValidationError(dgv, e.RowIndex, e.ColumnIndex, value);
         ApplyCellValidationVisuals(cell, error);
@@ -116,7 +112,7 @@ public partial class ConfigEditor : Form
     {
         var config = await _appConfiguration.GetCurrentConfiguration();
 
-        _serversBinding = new BindingList<ConfigFileServer>(config.Servers ?? new List<ConfigFileServer>());
+        _serversBinding = new BindingList<ConfigFileServer>(config.Servers ?? []);
         dataGridViewServers.AutoGenerateColumns = false;
         dataGridViewServers.DataSource = _serversBinding;
 

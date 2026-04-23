@@ -35,7 +35,7 @@ partial class TrayInfoPopup
         // tablePanel
         // 
         tablePanel.ColumnCount = 1;
-        tablePanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+        tablePanel.ColumnStyles.Add(new ColumnStyle());
         tablePanel.Dock = DockStyle.Fill;
         tablePanel.Location = new Point(0, 0);
         tablePanel.Name = "tablePanel";

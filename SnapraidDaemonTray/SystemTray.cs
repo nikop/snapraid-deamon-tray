@@ -70,9 +70,6 @@ public class SystemTray
             var trayForm = _trayScope.ServiceProvider.GetRequiredService<TrayInfoPopup>();
             var screen = Screen.FromPoint(Cursor.Position);
 
-            trayForm.StartPosition = FormStartPosition.Manual;
-            trayForm.Size = new Size(TrayInfoPopup.ItemWidth, TrayInfoPopup.ItemHeight * Math.Max(1, instances.Count));
-
             var x = screen.WorkingArea.Right - trayForm.Width;
             var y = screen.WorkingArea.Bottom - trayForm.Height;
 

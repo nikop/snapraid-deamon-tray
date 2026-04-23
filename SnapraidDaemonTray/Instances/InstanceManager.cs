@@ -69,7 +69,7 @@ public class InstanceManager
                     instance.MaintenanceCompletedError += Instance_MaintenanceError;
                 }
 
-                await instance.Update();
+                _ = instance.Update();
             }
 
             // Remove instances that are not present/enabled in the new configuration

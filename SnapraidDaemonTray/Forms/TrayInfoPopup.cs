@@ -21,7 +21,7 @@ public partial class TrayInfoPopup : Form, IWinFormsShell
 
     private async void MainForm_Load(object sender, EventArgs e)
     {
-        var intances = (await InstanceManager.GetAll()).ToList();
+        var intances = InstanceManager.Instances;
         tablePanel.RowCount = Math.Max(1, intances.Count);
         var i = 0;
 

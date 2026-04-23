@@ -8,9 +8,11 @@ internal partial class StartupHandler(InstanceManager instanceManager, SystemTra
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        var servers = await instanceManager.GetAll(true);
+        await instanceManager.ApplyCurrentConfiguration();
 
-        if (servers.Count == 0)
+        var instances = instanceManager.Instances;
+
+        if (instances.Count == 0)
         {
             // TODO: Show Setup
         }

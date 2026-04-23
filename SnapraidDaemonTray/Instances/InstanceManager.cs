@@ -1,9 +1,7 @@
 ﻿using SnapraidDaemonTray.Events;
 
 using System.Collections.Concurrent;
-using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
 
 namespace SnapraidDaemonTray.Instances;
 
@@ -40,7 +38,7 @@ public class InstanceManager
         return string.IsNullOrEmpty(result) ? "unknown" : result;
     }
 
-    private async Task UpdateInstancesInternal()
+    public async Task ApplyCurrentConfiguration()
     {
         await _lock.WaitAsync();
         try
@@ -103,7 +101,7 @@ public class InstanceManager
         {
             try
             {
-                await UpdateInstancesInternal();
+                await ApplyCurrentConfiguration();
             }
             catch
             {
@@ -152,15 +150,13 @@ public class InstanceManager
         notificationsHandler.MaintenanceError(instance, e);
     }
 
-    public Task UpdateInstances() => UpdateInstancesInternal(); // TODO
-
-    public async Task<List<Instance>> GetAll(bool update = false)
+    public async Task UpdateInstances()
     {
-        if (update)
+        foreach (var instance in _instances.Values)
         {
-            await UpdateInstancesInternal();
+            await instance.Update();
         }
-
-        return [.. _instances.Values];
     }
+
+    public List<Instance> Instances => [.. _instances.Values];
 }

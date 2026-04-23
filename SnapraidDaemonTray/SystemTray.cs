@@ -41,7 +41,7 @@ public class SystemTray(IHostApplicationLifetime lifetime, IServiceProvider serv
 
         await winFormsContext.Dispatcher.InvokeAsync(async () =>
         {
-            var instances = await _trayScope.ServiceProvider.GetRequiredService<InstanceManager>().GetAll(true);
+            var instances = _trayScope.ServiceProvider.GetRequiredService<InstanceManager>().Instances;
             var trayForm = _trayScope.ServiceProvider.GetRequiredService<TrayInfoPopup>();
             var screen = Screen.FromPoint(Cursor.Position);
 
@@ -69,7 +69,7 @@ public class SystemTray(IHostApplicationLifetime lifetime, IServiceProvider serv
     public async Task StartMaintenance()
     {
         using var scope = serviceProvider.CreateScope();
-        var instances = await scope.ServiceProvider.GetRequiredService<InstanceManager>().GetAll(true);
+        var instances = scope.ServiceProvider.GetRequiredService<InstanceManager>().Instances;
 
         foreach (var instance in instances)
         {
@@ -161,7 +161,7 @@ public class SystemTray(IHostApplicationLifetime lifetime, IServiceProvider serv
             }
 
             using var scope = serviceProvider.CreateScope();
-            var instances = await scope.ServiceProvider.GetRequiredService<InstanceManager>().GetAll();
+            var instances = scope.ServiceProvider.GetRequiredService<InstanceManager>().Instances;
 
             var sb = new StringBuilder();
             sb.AppendLine("Snapraid Daemon Tray");

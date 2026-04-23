@@ -158,5 +158,5 @@ public class InstanceManager
         }
     }
 
-    public List<Instance> Instances => [.. _instances.Values];
+    public ICollection<Instance> Instances => _instances.Values;
 }

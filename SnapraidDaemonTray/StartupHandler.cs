@@ -9,6 +9,7 @@ internal partial class StartupHandler(InstanceManager instanceManager, SystemTra
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         await instanceManager.ApplyCurrentConfiguration();
+        systemTray.Initialize();
 
         var instances = instanceManager.Instances;
 

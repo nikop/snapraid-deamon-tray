@@ -21,11 +21,9 @@ public class AppConfiguration
 
     public event EventHandler<ConfigChangedEventArgs>? ConfigurationChanged;
 
-    public sealed class ConfigChangedEventArgs : EventArgs
+    public sealed class ConfigChangedEventArgs(ConfigFile config) : EventArgs
     {
-        public ConfigFile Config { get; }
-
-        public ConfigChangedEventArgs(ConfigFile config) => Config = config;
+        public ConfigFile Config { get; } = config;
     }
 
     public AppConfiguration()

@@ -6,6 +6,8 @@ namespace SnapraidDaemonTray.Forms;
 
 public partial class TrayInfoPopup : Form, IWinFormsShell
 {
+    public const int ItemWidth = 400;
+
     public const int ItemHeight = 200;
 
     public InstanceManager InstanceManager { get; }

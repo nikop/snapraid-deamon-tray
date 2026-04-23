@@ -95,7 +95,7 @@ partial class InstanceInfoDisplay
         labelInstanceName.DataBindings.Add(new Binding("Text", instanceStatusInfoBindingSource, "Name", true));
         labelInstanceName.Dock = DockStyle.Left;
         labelInstanceName.Font = new Font("Segoe UI", 14.25F, FontStyle.Bold, GraphicsUnit.Point, 0);
-        labelInstanceName.LinkColor = SystemColors.ActiveCaption;
+        labelInstanceName.LinkColor = SystemColors.Highlight;
         labelInstanceName.Location = new Point(40, 8);
         labelInstanceName.Name = "labelInstanceName";
         labelInstanceName.Size = new Size(64, 25);

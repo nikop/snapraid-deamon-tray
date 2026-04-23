@@ -18,8 +18,8 @@ Application.SetColorMode(SystemColorMode.System);
 
 builder.Services.AddSingleton<AppConfiguration>();
 builder.Services.AddSingleton<InstanceManager>();
+builder.Services.AddSingleton<SystemTray>();
 
-builder.Services.AddWinFormsService<SystemTray>();
 builder.Services.AddWinFormsService<NotificationsHandler>();
 builder.Services.AddTransient<TrayInfoPopup>();
 builder.Services.AddTransient<ConfigEditor>();

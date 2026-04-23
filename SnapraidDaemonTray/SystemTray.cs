@@ -12,7 +12,7 @@ using System.Text;
 
 namespace SnapraidDaemonTray;
 
-public class SystemTray(IHostApplicationLifetime lifetime, IServiceProvider serviceProvider, IWinFormsContext winFormsContext) : IWinFormsService
+public class SystemTray
 {
     struct StatusMatrix
     {
@@ -29,7 +29,31 @@ public class SystemTray(IHostApplicationLifetime lifetime, IServiceProvider serv
 
     private readonly ContextMenuStrip contextMenuStrip = new();
 
+    private Dictionary<string, ToolStripMenuItem> instanceMenuItems = [];
+
     private volatile IServiceScope? _trayScope;
+
+    IHostApplicationLifetime Lifetime { get; }
+
+    AppConfiguration AppConfiguration { get; }
+
+    IServiceProvider ServiceProvider { get; }
+
+    IWinFormsContext WinFormsContext { get; }
+
+    public SystemTray(IHostApplicationLifetime lifetime, AppConfiguration appConfiguration, IServiceProvider serviceProvider, IWinFormsContext winFormsContext)
+    {
+        Lifetime = lifetime;
+        AppConfiguration = appConfiguration;
+        ServiceProvider = serviceProvider;
+        WinFormsContext = winFormsContext;
+
+        AppConfiguration.ConfigurationChanged += (sender, e) =>
+        {
+            WinFormsContext.Dispatcher.Invoke(UpdateContextMenu);
+            WinFormsContext.Dispatcher.Invoke(Update);
+        };
+    }
 
     public async Task OpenTrayPopup()
     {
@@ -38,16 +62,16 @@ public class SystemTray(IHostApplicationLifetime lifetime, IServiceProvider serv
             return;
         }
 
-        _trayScope = serviceProvider.CreateScope();
+        _trayScope = ServiceProvider.CreateScope();
 
-        await winFormsContext.Dispatcher.InvokeAsync(async () =>
+        await WinFormsContext.Dispatcher.InvokeAsync(async () =>
         {
             var instances = _trayScope.ServiceProvider.GetRequiredService<InstanceManager>().Instances;
             var trayForm = _trayScope.ServiceProvider.GetRequiredService<TrayInfoPopup>();
             var screen = Screen.FromPoint(Cursor.Position);
 
             trayForm.StartPosition = FormStartPosition.Manual;
-            trayForm.Size = new Size(400, TrayInfoPopup.ItemHeight * Math.Max(1, instances.Count));
+            trayForm.Size = new Size(TrayInfoPopup.ItemWidth, TrayInfoPopup.ItemHeight * Math.Max(1, instances.Count));
 
             var x = screen.WorkingArea.Right - trayForm.Width;
             var y = screen.WorkingArea.Bottom - trayForm.Height;
@@ -75,9 +99,9 @@ public class SystemTray(IHostApplicationLifetime lifetime, IServiceProvider serv
             return;
         }
 
-        var scope = serviceProvider.CreateScope();
+        var scope = ServiceProvider.CreateScope();
 
-        await winFormsContext.Dispatcher.InvokeAsync(() =>
+        await WinFormsContext.Dispatcher.InvokeAsync(() =>
         {
             try
             {
@@ -103,7 +127,7 @@ public class SystemTray(IHostApplicationLifetime lifetime, IServiceProvider serv
 
     public async Task StartMaintenance()
     {
-        using var scope = serviceProvider.CreateScope();
+        using var scope = ServiceProvider.CreateScope();
         var instances = scope.ServiceProvider.GetRequiredService<InstanceManager>().Instances;
 
         foreach (var instance in instances)
@@ -112,19 +136,44 @@ public class SystemTray(IHostApplicationLifetime lifetime, IServiceProvider serv
         }
     }
 
-    public void Initialize()
+    private void UpdateContextMenu()
     {
-        systemTray = new NotifyIcon
+        if (systemTray is null)
         {
-            Icon = Resources.TrayIcon,
-            Visible = true,
-            Text = ""
-        };
+            return;
+        }
 
-        contextMenuStrip.Items.Add("Run Maintenance on All Instances", null, async (sender, e) =>
+        using var scope = ServiceProvider.CreateScope();
+        var instances = scope.ServiceProvider.GetRequiredService<InstanceManager>().Instances;
+
+        contextMenuStrip.Items.Clear();
+
+        //contextMenuStrip.Items.Add("Run Maintenance on All Instances", null, async (sender, e) =>
+        //{
+        //    await StartMaintenance();
+        //});
+
+        instanceMenuItems.Clear();
+
+        foreach (var item in instances)
         {
-            await StartMaintenance();
-        });
+            var menuItem = new ToolStripMenuItem(item.Name, null, async (sender, e) =>
+            {
+                //await item.StartMaintenance(supressNotification: false);
+            });
+
+            menuItem.DropDownItems.Add("Run Maintenance", null, async (sender, e) =>
+            {
+                await item.StartMaintenance(supressNotification: false);
+            });
+
+            instanceMenuItems[item.Key] = menuItem;
+            contextMenuStrip.Items.Add(menuItem);
+        }
+
+        contextMenuStrip.Items.Add(new ToolStripSeparator());
+
+        //contextMenuStrip.Items.Add();
 
         contextMenuStrip.Items.Add("Edit Configuration", null, async (sender, e) =>
         {
@@ -134,8 +183,21 @@ public class SystemTray(IHostApplicationLifetime lifetime, IServiceProvider serv
         contextMenuStrip.Items.Add("Exit", null, (sender, e) =>
         {
             systemTray.Visible = false;
-            lifetime.StopApplication();
+            Lifetime.StopApplication();
         });
+
+
+    }
+
+    private void InitializeInternal()
+    {
+        systemTray = new NotifyIcon
+        {
+            Icon = Resources.TrayIcon,
+            Visible = true,
+            Text = "",
+            ContextMenuStrip = contextMenuStrip,
+        };
 
         systemTray.MouseClick += async (sender, e) =>
         {
@@ -152,21 +214,25 @@ public class SystemTray(IHostApplicationLifetime lifetime, IServiceProvider serv
             await OpenTrayPopup();
         };
 
-        systemTray.ContextMenuStrip = contextMenuStrip;
-
+        UpdateContextMenu();
         Update();
+    }
+
+    public void Initialize()
+    {
+        WinFormsContext.Dispatcher.Invoke(InitializeInternal);
     }
 
     public void Update()
     {
-        winFormsContext.Dispatcher.InvokeAsync(async () =>
+        WinFormsContext.Dispatcher.InvokeAsync(async () =>
         {
             if (systemTray is null)
             {
                 return;
             }
 
-            using var scope = serviceProvider.CreateScope();
+            using var scope = ServiceProvider.CreateScope();
             var instances = scope.ServiceProvider.GetRequiredService<InstanceManager>().Instances;
 
             var sb = new StringBuilder();

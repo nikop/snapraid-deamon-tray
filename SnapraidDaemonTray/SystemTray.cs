@@ -248,13 +248,16 @@ public class SystemTray
                     statusMatrix.Warning++;
                 }
 
-                if (instance.Status.CurrentCommand is null)
+                if (instance.Status.Health != HealthStatus.NoConnection)
                 {
-                    statusMatrix.Idle++;
-                }
-                else
-                {
-                    statusMatrix.Active++;
+                    if (instance.Status.CurrentCommand is null)
+                    {
+                        statusMatrix.Idle++;
+                    }
+                    else
+                    {
+                        statusMatrix.Active++;
+                    }
                 }
 
                 sb.AppendLine($"{instance.Name}: {instance.Status.Health}");

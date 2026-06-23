@@ -41,6 +41,8 @@ public class Instance
 
     public event EventHandler<MaintenanceProgressEventArgs>? MaintenanceProgress;
 
+    public event EventHandler<MaintenanceThresholdExceededEventArgs>? MaintenanceThresholdExceeded;
+
     public event EventHandler<MaintenanceCompletedEventArgs>? MaintenanceCompleted;
 
     public event EventHandler<MaintenanceErrorEventArgs>? MaintenanceCompletedError;
@@ -63,12 +65,12 @@ public class Instance
         };
     }
 
-    public async Task StartMaintenance(bool supressNotification = true)
+    public async Task StartMaintenance(bool ignoreThreasholds = false, bool supressNotification = true)
     {
         _manualMaintenanceRequested = supressNotification;
         var response = await _client.Snapraid.V1.Maintenance.PostAsMaintenancePostResponseAsync(new CommandRequest
         {
-            IgnoreThresholds = false
+            IgnoreThresholds = ignoreThreasholds
         });
         await UpdateActivity(force: true);
     }
@@ -351,11 +353,18 @@ public class Instance
                 }
                 else if (latestSync.ExitCode is 2)
                 {
-                    // TODO: Notification for threshold exceeded
+                    var fatalMessages = latestSync.Messages?.Where(x => x.Level == Message_level.Fatal).ToList() ?? [];
+
+                    MaintenanceThresholdExceeded?.Invoke(this, new MaintenanceThresholdExceededEventArgs {
+                        Message = string.Join("\r\n", fatalMessages.Select(x => x.Text)),
+                    });
                 }
                 else
                 {
-                    //
+                    MaintenanceCompleted?.Invoke(this, new MaintenanceCompletedEventArgs
+                    {
+                        
+                    });
                 }
 
             }

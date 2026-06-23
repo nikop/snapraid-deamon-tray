@@ -2,6 +2,7 @@
 
 using Humanizer;
 
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Windows.AppNotifications;
 using Microsoft.Windows.AppNotifications.Builder;
@@ -11,7 +12,7 @@ using SnapraidDaemonTray.Instances;
 
 namespace SnapraidDaemonTray;
 
-public class NotificationsHandler(ILogger<NotificationsHandler> logger, SystemTray systemTray) : IWinFormsService
+public class NotificationsHandler(ILogger<NotificationsHandler> logger, IServiceProvider serviceProvider, SystemTray systemTray) : IWinFormsService
 {
 #if DEBUG
     public const string AppDisplayName = "Snapraid Daemon Tray (Debug)";
@@ -25,6 +26,26 @@ public class NotificationsHandler(ILogger<NotificationsHandler> logger, SystemTr
     {
         AppNotificationManager.Default.NotificationInvoked += async (sender, e) =>
         {
+            using var scope = serviceProvider.CreateScope();
+            var instanceManager = scope.ServiceProvider.GetRequiredService<InstanceManager>();
+
+            if (e.Arguments.TryGetValue("action", out string? action) && e.Arguments.TryGetValue("instance", out string? instanceName))
+            {
+                var instance = instanceManager.Instances.FirstOrDefault(i => i.Key == instanceName);
+
+                if (instance is null)
+                {
+                    return;
+                }
+
+                switch (action)
+                {
+                    case "force_sync":
+                        await instance.StartMaintenance(ignoreThreasholds: true);
+                        return;
+                }
+            }
+
             await systemTray.OpenTrayPopup();
         };
         AppNotificationManager.Default.Register(AppDisplayName, new Uri(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Icons", "tray.ico")));
@@ -85,6 +106,33 @@ public class NotificationsHandler(ILogger<NotificationsHandler> logger, SystemTr
     public async Task MaintenanceProgress(Instance instance, MaintenanceProgressEventArgs e)
     {
         var res = await AppNotificationManager.Default.UpdateAsync(BuldProgressData(e), $"{instance.Key}:maintenance");
+    }
+
+    public void MaintenanceThresholdExceeded(Instance instance, MaintenanceThresholdExceededEventArgs e)
+    {
+        logger.LogTrace("Maintenance Completed for {instance}", instance.Name);
+
+        var notification = new AppNotificationBuilder()
+            .SetTag($"{instance.Key}:maintenance_skipped")
+            .AddText("Maintenance Skipped!")
+            .AddText(e.Message, new AppNotificationTextProperties { MaxLines = 4 })
+            .AddButton(new AppNotificationButton
+            {
+                Content = "Force Sync",
+                Arguments =
+                {
+                    { "instance", instance.Key },
+                    { "action", "force_sync" },
+                }
+            })
+            .AddButton(new AppNotificationButton
+            {
+                Content = "Open Dashboard",
+                InvokeUri = new Uri(instance.Address),
+            })
+            .BuildNotification();
+
+        AppNotificationManager.Default.Show(notification);
     }
 
     /// <summary>

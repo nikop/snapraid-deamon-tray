@@ -65,6 +65,7 @@ public class InstanceManager
 
                     instance.MaintenanceStarted += Instance_MaintenanceStarted;
                     instance.MaintenanceProgress += Instance_MaintenanceProgress;
+                    instance.MaintenanceThresholdExceeded += Instance_MaintenanceThresholdExceeded;
                     instance.MaintenanceCompleted += Instance_MaintenanceCompleted;
                     instance.MaintenanceCompletedError += Instance_MaintenanceError;
                 }
@@ -82,6 +83,7 @@ public class InstanceManager
                         // Unsubscribe events to avoid potential memory leaks
                         removed.MaintenanceStarted -= Instance_MaintenanceStarted;
                         removed.MaintenanceProgress -= Instance_MaintenanceProgress;
+                        removed.MaintenanceThresholdExceeded -= Instance_MaintenanceThresholdExceeded;
                         removed.MaintenanceCompleted -= Instance_MaintenanceCompleted;
                         removed.MaintenanceCompletedError -= Instance_MaintenanceError;
                     }
@@ -128,6 +130,16 @@ public class InstanceManager
         }
 
         _ = notificationsHandler.MaintenanceProgress(instance, e);
+    }
+
+    private void Instance_MaintenanceThresholdExceeded(object? sender, MaintenanceThresholdExceededEventArgs e)
+    {
+        if (sender is not Instance instance)
+        {
+            return;
+        }
+
+        notificationsHandler.MaintenanceThresholdExceeded(instance, e);
     }
 
     private void Instance_MaintenanceCompleted(object? sender, MaintenanceCompletedEventArgs e)

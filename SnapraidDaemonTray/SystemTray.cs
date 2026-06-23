@@ -265,9 +265,9 @@ public class SystemTray
 
             systemTray.Icon = statusMatrix switch
             {
+                { Active: > 0 } => Resources.statusActive,
                 { Error: > 0 } => Resources.statusError,
                 { Warning: > 0 } => Resources.statusWarning,
-                { Active: > 0 } => Resources.statusActive,
                 { Idle: > 0 } => Resources.statusOk,
                 _ => Resources.TrayIcon
             };

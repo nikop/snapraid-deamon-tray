@@ -31,13 +31,15 @@ partial class ConfigEditor
         tabControlMain = new TabControl();
         tabPageServers = new TabPage();
         dataGridViewServers = new DataGridView();
+        colEnabled = new DataGridViewCheckBoxColumn();
+        colName = new DataGridViewTextBoxColumn();
+        colAddress = new DataGridViewTextBoxColumn();
         buttonAdd = new Button();
         buttonRemove = new Button();
         buttonSave = new Button();
         buttonCancel = new Button();
-        colEnabled = new DataGridViewCheckBoxColumn();
-        colName = new DataGridViewTextBoxColumn();
-        colAddress = new DataGridViewTextBoxColumn();
+        tabPage1 = new TabPage();
+        checkBoxRunAtStartup = new CheckBox();
         tabControlMain.SuspendLayout();
         tabPageServers.SuspendLayout();
         ((System.ComponentModel.ISupportInitialize)dataGridViewServers).BeginInit();
@@ -46,6 +48,7 @@ partial class ConfigEditor
         // tabControlMain
         // 
         tabControlMain.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
+        tabControlMain.Controls.Add(tabPage1);
         tabControlMain.Controls.Add(tabPageServers);
         tabControlMain.Location = new Point(12, 12);
         tabControlMain.Name = "tabControlMain";
@@ -78,6 +81,29 @@ partial class ConfigEditor
         dataGridViewServers.SelectionMode = DataGridViewSelectionMode.CellSelect;
         dataGridViewServers.Size = new Size(583, 191);
         dataGridViewServers.TabIndex = 0;
+        // 
+        // colEnabled
+        // 
+        colEnabled.DataPropertyName = "Enabled";
+        colEnabled.FillWeight = 29.9845352F;
+        colEnabled.HeaderText = "Enabled";
+        colEnabled.MinimumWidth = 25;
+        colEnabled.Name = "colEnabled";
+        colEnabled.Resizable = DataGridViewTriState.False;
+        // 
+        // colName
+        // 
+        colName.DataPropertyName = "Name";
+        colName.FillWeight = 83.456955F;
+        colName.HeaderText = "Name";
+        colName.Name = "colName";
+        // 
+        // colAddress
+        // 
+        colAddress.DataPropertyName = "Address";
+        colAddress.FillWeight = 83.456955F;
+        colAddress.HeaderText = "Address";
+        colAddress.Name = "colAddress";
         // 
         // buttonAdd
         // 
@@ -123,28 +149,27 @@ partial class ConfigEditor
         buttonCancel.UseVisualStyleBackColor = true;
         buttonCancel.Click += buttonCancel_Click;
         // 
-        // colEnabled
+        // tabPage1
         // 
-        colEnabled.DataPropertyName = "Enabled";
-        colEnabled.FillWeight = 29.9845352F;
-        colEnabled.HeaderText = "Enabled";
-        colEnabled.MinimumWidth = 25;
-        colEnabled.Name = "colEnabled";
-        colEnabled.Resizable = DataGridViewTriState.False;
+        tabPage1.Location = new Point(4, 24);
+        tabPage1.Name = "tabPage1";
+        tabPage1.Padding = new Padding(3);
+        tabPage1.Size = new Size(595, 263);
+        tabPage1.TabIndex = 1;
+        tabPage1.Text = "Settings";
+        tabPage1.UseVisualStyleBackColor = true;
+        tabPage1.Controls.Add(checkBoxRunAtStartup);
         // 
-        // colName
+        // checkBoxRunAtStartup
         // 
-        colName.DataPropertyName = "Name";
-        colName.FillWeight = 83.456955F;
-        colName.HeaderText = "Name";
-        colName.Name = "colName";
-        // 
-        // colAddress
-        // 
-        colAddress.DataPropertyName = "Address";
-        colAddress.FillWeight = 83.456955F;
-        colAddress.HeaderText = "Address";
-        colAddress.Name = "colAddress";
+        checkBoxRunAtStartup.AutoSize = true;
+        checkBoxRunAtStartup.Location = new Point(15, 20);
+        checkBoxRunAtStartup.Name = "checkBoxRunAtStartup";
+        checkBoxRunAtStartup.Size = new Size(200, 19);
+        checkBoxRunAtStartup.TabIndex = 0;
+        checkBoxRunAtStartup.Text = "Run application at Windows startup";
+        checkBoxRunAtStartup.UseVisualStyleBackColor = true;
+        checkBoxRunAtStartup.CheckedChanged += checkBoxRunAtStartup_CheckedChanged;
         // 
         // ConfigEditor
         // 
@@ -153,9 +178,9 @@ partial class ConfigEditor
         AutoScaleMode = AutoScaleMode.Font;
         CancelButton = buttonCancel;
         ClientSize = new Size(627, 344);
+        Controls.Add(tabControlMain);
         Controls.Add(buttonCancel);
         Controls.Add(buttonSave);
-        Controls.Add(tabControlMain);
         KeyPreview = true;
         Name = "ConfigEditor";
         Text = "Configuration Editor";
@@ -179,4 +204,6 @@ partial class ConfigEditor
     private DataGridViewCheckBoxColumn colEnabled;
     private DataGridViewTextBoxColumn colName;
     private DataGridViewTextBoxColumn colAddress;
+    private TabPage tabPage1;
+    private CheckBox checkBoxRunAtStartup;
 }

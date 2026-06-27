@@ -116,6 +116,9 @@ public partial class ConfigEditor : Form
         dataGridViewServers.AutoGenerateColumns = false;
         dataGridViewServers.DataSource = _serversBinding;
 
+        // Load startup setting
+        checkBoxRunAtStartup.Checked = config.RunAtStartup;
+
         // Track changes to detect unsaved edits
         _isDirty = false;
         _serversBinding.ListChanged += (s, ev) => { _isDirty = true; };
@@ -128,6 +131,8 @@ public partial class ConfigEditor : Form
                 dataGridViewServers.CommitEdit(DataGridViewDataErrorContexts.Commit);
             }
         };
+
+        checkBoxRunAtStartup.CheckedChanged += (s, ev) => { _isDirty = true; };
     }
 
     private async void buttonSave_Click(object sender, EventArgs e)
@@ -162,11 +167,28 @@ public partial class ConfigEditor : Form
 
         var config = new ConfigFile
         {
-            Servers = servers
+            Servers = servers,
+            RunAtStartup = checkBoxRunAtStartup.Checked
         };
 
         try
         {
+            // Handle startup registration
+            if (checkBoxRunAtStartup.Checked)
+            {
+                if (!StartupHelper.RegisterStartup())
+                {
+                    MessageBox.Show("Warning: Failed to register application for startup. Configuration will still be saved.", "Startup Registration", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                }
+            }
+            else
+            {
+                if (!StartupHelper.UnregisterStartup())
+                {
+                    MessageBox.Show("Warning: Failed to unregister application from startup. Configuration will still be saved.", "Startup Registration", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                }
+            }
+
             await _appConfiguration.SaveConfig(config);
             _isDirty = false;
             //MessageBox.Show("Configuration saved.", "Save", MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -195,6 +217,12 @@ public partial class ConfigEditor : Form
     private void buttonCancel_Click(object sender, EventArgs e)
     {
         Close();
+    }
+
+    private void checkBoxRunAtStartup_CheckedChanged(object sender, EventArgs e)
+    {
+        // This event handler is mainly for tracking changes
+        // The actual startup registration happens when Save is clicked
     }
 
     protected override bool ProcessCmdKey(ref Message msg, Keys keyData)

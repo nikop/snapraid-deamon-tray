@@ -117,7 +117,7 @@ public partial class ConfigEditor : Form
         dataGridViewServers.DataSource = _serversBinding;
 
         // Load startup setting
-        checkBoxRunAtStartup.Checked = config.RunAtStartup;
+        checkBoxRunAtStartup.Checked = StartupHelper.IsStartupRegistered();
 
         // Track changes to detect unsaved edits
         _isDirty = false;
@@ -168,7 +168,6 @@ public partial class ConfigEditor : Form
         var config = new ConfigFile
         {
             Servers = servers,
-            RunAtStartup = checkBoxRunAtStartup.Checked
         };
 
         try

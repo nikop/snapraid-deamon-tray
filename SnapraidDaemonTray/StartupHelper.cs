@@ -9,8 +9,17 @@ namespace SnapraidDaemonTray;
 /// </summary>
 public static class StartupHelper
 {
+#if DEBUG
+    private const string AppName = "SnapraidDaemonTray_Debug";
+#else
     private const string AppName = "SnapraidDaemonTray";
+#endif
     private const string RegistryPath = @"Software\Microsoft\Windows\CurrentVersion\Run";
+
+    public static string GetExecutablePath()
+    {
+        return Process.GetCurrentProcess().MainModule?.FileName ?? throw new InvalidOperationException("Failed to get executable path");
+    }
 
     /// <summary>
     /// Registers the application to run at Windows startup via registry.
@@ -20,26 +29,20 @@ public static class StartupHelper
     {
         try
         {
-            var exePath = Process.GetCurrentProcess().MainModule?.FileName;
-            if (string.IsNullOrEmpty(exePath))
+            var exePath = GetExecutablePath();
+
+            using var key = Registry.CurrentUser.OpenSubKey(RegistryPath, writable: true);
+
+            if (key == null)
             {
-                Debug.WriteLine("Failed to get executable path");
+                Debug.WriteLine("Failed to open registry key");
                 return false;
             }
 
-            using (var key = Registry.CurrentUser.OpenSubKey(RegistryPath, writable: true))
-            {
-                if (key == null)
-                {
-                    Debug.WriteLine("Failed to open registry key");
-                    return false;
-                }
-
-                // Set the registry value
-                key.SetValue(AppName, exePath);
-                Debug.WriteLine($"Registered startup for: {exePath}");
-                return true;
-            }
+            // Set the registry value
+            key.SetValue(AppName, exePath);
+            Debug.WriteLine($"Registered startup for: {exePath}");
+            return true;
         }
         catch (Exception ex)
         {
@@ -56,23 +59,21 @@ public static class StartupHelper
     {
         try
         {
-            using (var key = Registry.CurrentUser.OpenSubKey(RegistryPath, writable: true))
+            using var key = Registry.CurrentUser.OpenSubKey(RegistryPath, writable: true);
+            if (key == null)
             {
-                if (key == null)
-                {
-                    Debug.WriteLine("Failed to open registry key");
-                    return false;
-                }
-
-                // Remove the registry value
-                if (key.GetValue(AppName) != null)
-                {
-                    key.DeleteValue(AppName);
-                    Debug.WriteLine("Unregistered startup");
-                }
-
-                return true;
+                Debug.WriteLine("Failed to open registry key");
+                return false;
             }
+
+            // Remove the registry value
+            if (key.GetValue(AppName) != null)
+            {
+                key.DeleteValue(AppName);
+                Debug.WriteLine("Unregistered startup");
+            }
+
+            return true;
         }
         catch (Exception ex)
         {
@@ -89,14 +90,13 @@ public static class StartupHelper
     {
         try
         {
-            using (var key = Registry.CurrentUser.OpenSubKey(RegistryPath))
-            {
-                if (key == null)
-                    return false;
+            using var key = Registry.CurrentUser.OpenSubKey(RegistryPath);
+            if (key == null)
+                return false;
 
-                var value = key.GetValue(AppName);
-                return value != null;
-            }
+            var value = (string?) key.GetValue(AppName);
+
+            return value == GetExecutablePath();
         }
         catch (Exception ex)
         {

@@ -4,6 +4,5 @@ namespace SnapraidDaemonTray.Config;
 
 public class ConfigFile
 {
-    public List<ConfigFileServer> Servers { get; set; } = new List<ConfigFileServer>();
-    public bool RunAtStartup { get; set; } = false;
+    public List<ConfigFileServer> Servers { get; set; } = [];
 }
